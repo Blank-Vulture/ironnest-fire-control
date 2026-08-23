@@ -203,14 +203,23 @@ code {
 
 /* ---------- 戦術地図 ---------- */
 
-.map {
-  width: 100%;
-  height: auto;
+.mapwrap {
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  /* viewBox の 1 単位が 1km。線の太さは倍率に引きずられないよう固定する */
-  overflow: visible;
+  overflow: hidden;
+}
+
+.map {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: grab;
+}
+
+.map:active {
+  cursor: grabbing;
 }
 
 .map__field {
@@ -226,9 +235,14 @@ code {
 .map__labels text {
   fill: var(--muted);
   font-family: var(--mono);
-  font-size: 0.34px;
   text-anchor: middle;
   dominant-baseline: middle;
+  /* 円や線の上に重なっても読めるよう、地の色で縁取る */
+  stroke: #0f1319;
+  stroke-width: 3;
+  paint-order: stroke;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
 }
 
 /* 距離の報告 */
@@ -247,66 +261,139 @@ code {
   opacity: 0.85;
 }
 
-.map__spot circle {
-  fill: currentColor;
+/* ---------- 地図上の印 ---------- */
+
+.pin {
+  cursor: pointer;
 }
 
-.map__spot text {
-  fill: currentColor;
-  font-size: 0.3px;
-  font-family: var(--sans);
+.pin__hit {
+  fill: transparent;
+  stroke: none;
+}
+
+.pin__name {
   text-anchor: middle;
+  font-family: var(--sans);
+  pointer-events: none;
 }
 
-.map__nest circle {
+.pin__name {
+  fill: currentColor;
+}
+
+.pin--nest .pin__ring,
+.pin--nest .pin__cross {
   fill: none;
-  stroke: var(--accent);
+  stroke: currentColor;
   stroke-width: 1.6;
   vector-effect: non-scaling-stroke;
 }
 
-.map__nest path {
-  stroke: var(--accent);
-  stroke-width: 1.6;
-  vector-effect: non-scaling-stroke;
-}
-
-.map__nest text {
-  fill: var(--accent);
-  font-size: 0.34px;
+.pin--nest .pin__name {
   font-family: var(--mono);
-  letter-spacing: 0.02px;
-  text-anchor: middle;
 }
 
-.map__fix path {
-  stroke: var(--text);
-  stroke-width: 2;
+.pin--known .pin__dot {
+  fill: currentColor;
+}
+
+.pin--fix .pin__x {
+  stroke: currentColor;
+  stroke-width: 2.4;
   vector-effect: non-scaling-stroke;
 }
 
-.map__fix text {
-  fill: var(--text);
-  font-size: 0.32px;
-  font-family: var(--sans);
-  text-anchor: middle;
-}
-
-.map__alt circle {
+.pin--alt .pin__alt {
   fill: none;
-  stroke: var(--muted);
-  stroke-width: 1.4;
+  stroke: currentColor;
+  stroke-width: 1.6;
   stroke-dasharray: 4 3;
   vector-effect: non-scaling-stroke;
 }
 
-.map__alt text {
-  fill: var(--muted);
-  font-size: 0.28px;
-  font-family: var(--sans);
-  text-anchor: middle;
+/* 触れている印は白く縁取って前に出す。色そのものは変えない */
+.pin.is-active .pin__dot {
+  stroke: #fff;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
 }
 
+.pin.is-active .pin__x,
+.pin.is-active .pin__alt,
+.pin.is-active .pin__ring,
+.pin.is-active .pin__cross {
+  filter: brightness(1.5);
+}
+
+.pin.is-active .pin__name {
+  fill: #fff;
+}
+
+/* ---------- 吹き出し ---------- */
+
+.callout {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 14px));
+  background: var(--bg);
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+}
+
+.callout.is-pinned {
+  border-color: var(--accent);
+}
+
+.callout__name {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.callout__grid {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--accent);
+}
+
+/* ---------- 倍率の操作 ---------- */
+
+.mapzoom {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  display: flex;
+  gap: 4px;
+}
+
+.mapzoom button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.mapzoom button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- 既知点 ---------- */
 /* ---------- 既知点 ---------- */
 
 .known,
@@ -458,6 +545,20 @@ code {
   font-size: clamp(17px, 2.6vw, 21px);
   color: var(--accent);
   white-space: nowrap;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+/* 候補が 2 つあるときだけ、どちらの候補かを添える */
+.fix__cand {
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 5px;
 }
 
 .fix__remove {

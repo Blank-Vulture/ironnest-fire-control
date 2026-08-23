@@ -57,6 +57,7 @@ export function FixCard({
 
         <span className="fix__position">
           {position !== null ? (formatPoint(position) ?? 'マップ外') : '—'}
+          {resolved.alternative !== null && <span className="fix__cand">候補地 1</span>}
         </span>
 
         <button className="fix__remove" onClick={onRemove} aria-label={`${fix.label} を削除`}>
@@ -130,7 +131,7 @@ export function FixCard({
 
       {resolved.alternative !== null && (
         <div className="fix__alt">
-          <span className="fix__k">もう一方</span>
+          <span className="fix__k">候補地 2</span>
           <strong className="fix__altgrid">
             {formatPoint(resolved.alternative) ?? 'マップ外'}
           </strong>

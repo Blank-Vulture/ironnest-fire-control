@@ -228,3 +228,36 @@ describe('砲座から見た諸元', () => {
     expect(distanceKm).toBeCloseTo(6.2, 1)
   })
 })
+
+describe('盤面の外の候補', () => {
+  /** 中心が同じ高さに並ぶ 2 円。交点は南北に開く。 */
+  const pair = (cx1: number, cx2: number, y: number, radius: number): Observation[] => [
+    { id: 'a', label: 'a', position: { x: cx1, y }, bearingDeg: null, rangeKm: radius },
+    { id: 'b', label: 'b', position: { x: cx2, y }, bearingDeg: null, rangeKm: radius },
+  ]
+
+  it('交点の片方が地図の外なら、中の方を目標にする', () => {
+    // 中心 (8,0.4) と (12,0.4)、半径 2.5。交点は (10, 1.9) と (10, -1.1)。
+    // 後者は南端の外なので、目標にはなりえない。
+    const e = solved(triangulate(pair(8, 12, 0.4, 2.5)))
+    expect(e.position.x).toBeCloseTo(10, 3)
+    expect(e.position.y).toBeCloseTo(1.9, 3)
+    // 外の候補は相手にしないので、曖昧さも残らない
+    expect(e.alternative).toBeNull()
+  })
+
+  it('両方とも盤面の中なら、これまでどおり曖昧として両方出す', () => {
+    // 交点は (10, 6.5) と (10, 3.5)。どちらも盤面の中。
+    const e = solved(triangulate(pair(8, 12, 5, 2.5)))
+    expect(e.alternative).not.toBeNull()
+    const ys = [e.position.y, e.alternative!.y].sort((p, q) => p - q)
+    expect(ys[0]).toBeCloseTo(3.5, 3)
+    expect(ys[1]).toBeCloseTo(6.5, 3)
+  })
+
+  it('どの候補も盤面の外なら、いちばん整合する点をそのまま返す', () => {
+    // 東の外で交わる 2 円。選びようがないので、黙って捨てたりはしない。
+    const e = solved(triangulate(pair(25, 29, 5, 2.5)))
+    expect(e.position.x).toBeCloseTo(27, 3)
+  })
+})

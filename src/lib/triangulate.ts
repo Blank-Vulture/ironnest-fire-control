@@ -10,7 +10,14 @@
  * どちらもこのモジュールが検出して呼び出し側に伝える。
  */
 
-import { bearingBetween, distanceBetween, pointFrom, type Point } from './grid'
+import {
+  MAP_HEIGHT_KM,
+  MAP_WIDTH_KM,
+  bearingBetween,
+  distanceBetween,
+  pointFrom,
+  type Point,
+} from './grid'
 
 export interface Observation {
   id: string
@@ -62,6 +69,16 @@ export const SHALLOW_CROSSING_DEG = 20
 
 /** 別候補がこの距離より離れていて、かつ同程度に整合していれば曖昧とみなす。 */
 const AMBIGUITY_SEPARATION_KM = 0.3
+
+/**
+ * 盤面の中にあるか。
+ *
+ * 交点が 2 つ出ても、片方が地図の外なら目標ではありえない。
+ * 盤面に入っている候補があるなら、そちらだけを相手にする。
+ */
+function onMap(point: Point): boolean {
+  return point.x >= 0 && point.x < MAP_WIDTH_KM && point.y >= 0 && point.y < MAP_HEIGHT_KM
+}
 
 function countConstraints(observations: readonly Observation[]): number {
   return observations.reduce(
@@ -268,12 +285,17 @@ export function triangulate(observations: readonly Observation[]): Triangulation
   })
   refined.sort((a, b) => a.score - b.score)
 
-  const best = refined[0]!
+  // 盤面に入っている候補があるなら、外の候補は初めから捨てる。
+  // これだけで、交点が 2 つ出ても片方が地図の外なら曖昧さが消える。
+  const inside = refined.filter((r) => onMap(r.point))
+  const pool = inside.length > 0 ? inside : refined
+
+  const best = pool[0]!
   const rms = Math.sqrt(best.score / constraintCount)
 
   // 同じくらい辻褄が合うのに離れている点があれば、決め手が足りていない
   const alternative =
-    refined.find(
+    pool.find(
       (r) =>
         distanceBetween(r.point, best.point) > AMBIGUITY_SEPARATION_KM &&
         Math.sqrt(r.score / constraintCount) <= Math.max(rms * 1.5, rms + 0.15),
