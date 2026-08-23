@@ -35,13 +35,18 @@ export const NEST_FIX_ID = 'nest-position'
  * 基準点は High Command から座標をそのまま渡されることがあるので、
  * 三角測量を経ずに置ける。
  */
-export type KnownKind = 'spotter' | 'reference'
+export type KnownKind = 'spotter' | 'reference' | 'impact'
 
 export interface KnownPoint {
   id: PointId
   label: string
   gridInput: string
-  /** 観測員か基準点か。砲座と補給隊はこの区別を持たない。 */
+  /**
+   * 観測員か、基準点か、着弾点か。砲座と補給隊はこの区別を持たない。
+   *
+   * 着弾点は外れ弾が落ちた場所。撃った座標そのものなので位置が正確に分かる。
+   * そこから目標までの距離が報告されるので、距離だけの観測元として働く。
+   */
   kind?: KnownKind
   /** 砲座。射撃諸元の基準になるので 1 つだけ。 */
   isNest: boolean

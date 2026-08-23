@@ -37,6 +37,9 @@ const HOSTILE_DIM = 'hsl(6 44% 48%)'
 /** 基準点。ゲーム内の A〜E トークンに合わせて緑。 */
 const REFERENCE = 'hsl(142 52% 55%)'
 
+/** 着弾点。味方でも敵でも基準点でもないので、白に寄せて独立させる。 */
+const IMPACT = 'hsl(40 12% 82%)'
+
 function friendlyColor(index: number): string {
   return `hsl(${FRIENDLY_HUE} 72% ${FRIENDLY_LIGHTNESS[index % FRIENDLY_LIGHTNESS.length]!}%)`
 }
@@ -68,7 +71,7 @@ const MAX_SPAN = FULL_VIEW.w
 
 interface Marker {
   id: string
-  kind: 'nest' | 'known' | 'fix' | 'alt'
+  kind: 'nest' | 'known' | 'impact' | 'fix' | 'alt'
   /** 吹き出しに出す名前。候補が 2 つあるときは「目標 1（候補地 2）」のようになる。 */
   name: string
   at: Point
@@ -126,6 +129,7 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
     const point = doc.known.find((k) => k.id === id)
     if (point?.isNest === true) return 'var(--accent)'
     if (point?.kind === 'reference') return REFERENCE
+    if (point?.kind === 'impact') return IMPACT
     const spotterIndex = spotters.findIndex((k) => k.id === id)
     if (spotterIndex >= 0) return friendlyColor(spotterIndex)
     // 撃って確かめた標定は、もう推定ではなく基準点として働いている
@@ -169,7 +173,7 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
     if (at === undefined || isHidden(point.id)) continue
     markers.push({
       id: point.id,
-      kind: point.isNest ? 'nest' : 'known',
+      kind: point.isNest ? 'nest' : point.kind === 'impact' ? 'impact' : 'known',
       name: point.label,
       at,
       color: colorOf(point.id),
@@ -454,6 +458,14 @@ function Pin({ marker, px, active, dim, onEnter, onLeave, onPick }: PinProps) {
           />
         </>
       )}
+      {kind === 'impact' && (
+        // 着弾の跡。星形にして、観測員の丸とも標定の × とも取り違えないようにする
+        <path
+          className="pin__burst"
+          d={`M ${cx} ${cy - px(9)} L ${cx + px(2.6)} ${cy - px(2.6)} L ${cx + px(9)} ${cy} L ${cx + px(2.6)} ${cy + px(2.6)} L ${cx} ${cy + px(9)} L ${cx - px(2.6)} ${cy + px(2.6)} L ${cx - px(9)} ${cy} L ${cx - px(2.6)} ${cy - px(2.6)} Z`}
+        />
+      )}
+
       {kind === 'known' &&
         (marker.lost === true ? (
           // 撃破された観測員。中を抜いて×を重ね、残っている観測員と見分ける
@@ -483,7 +495,13 @@ function Pin({ marker, px, active, dim, onEnter, onLeave, onPick }: PinProps) {
       <text
         className="pin__name"
         x={cx}
-        y={kind === 'nest' ? cy - px(26) : kind === 'known' ? cy - px(13) : cy + px(24)}
+        y={
+          kind === 'nest'
+            ? cy - px(26)
+            : kind === 'known' || kind === 'impact'
+              ? cy - px(13)
+              : cy + px(24)
+        }
         fontSize={px(10)}
       >
         {marker.lost === true ? `${name}（撃破）` : name}

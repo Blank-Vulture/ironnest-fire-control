@@ -316,6 +316,10 @@ code {
   fill: currentColor;
 }
 
+.pin--impact .pin__burst {
+  fill: currentColor;
+}
+
 .pin--fix .pin__x {
   stroke: currentColor;
   stroke-width: 2.4;
@@ -1395,6 +1399,15 @@ code {
   min-width: 0;
 }
 
+.known__row.is-impact {
+  border-style: dashed;
+}
+
+.known__from.is-impact {
+  color: var(--text);
+  border-color: var(--line);
+}
+
 .known__from {
   font-size: 9px;
   letter-spacing: 0.06em;
@@ -1655,6 +1668,15 @@ code {
   font-size: 12px;
   padding: 6px 7px;
   min-width: 0;
+}
+
+.known__row.is-impact {
+  border-style: dashed;
+}
+
+.known__from.is-impact {
+  color: var(--text);
+  border-color: var(--line);
 }
 
 .known__from {
@@ -2883,6 +2905,53 @@ code {
 /* 確認射撃のカード。普通の攻撃と取り違えないよう縁で見分ける */
 .card.is-verifying {
   border-top: 3px solid var(--ink);
+}
+
+/* 外れ弾の報告 */
+.card__impact {
+  flex-basis: 100%;
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 6px 9px;
+  border-top: 1px dashed var(--paper-line);
+  padding-top: 7px;
+}
+
+.card__impactfield {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.card__impactfield input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--paper-line);
+  border-radius: 3px;
+  padding: 4px 7px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+
+.card__record {
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 3px;
+  padding: 5px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.card__record:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 /* ---------- 確認射撃の結果 ---------- */

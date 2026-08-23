@@ -11,8 +11,12 @@ interface Props {
   onCharge: (charge: ChargeSetting) => void
   onGun: (gun: GunSetting) => void
   onImpact: (digits: string) => void
+  onImpactRange: (value: string) => void
+  onImpactGrid: (value: string) => void
   onToggleDone: () => void
   onReportOutcome: (outcome: 'hit' | 'miss') => void
+  onReportMiss: () => void
+  onRecordImpact: () => void
   /** 観測基準点への射撃か。普通の攻撃と確認射撃を見分けるため。 */
   verifying: boolean
   onRemove: () => void
@@ -29,8 +33,12 @@ export function SolutionCard({
   onCharge,
   onGun,
   onImpact,
+  onImpactRange,
+  onImpactGrid,
   onToggleDone,
   onReportOutcome,
+  onReportMiss,
+  onRecordImpact,
   verifying,
   onRemove,
 }: Props) {
@@ -209,6 +217,65 @@ export function SolutionCard({
                 ? 'この位置を実測座標として確定しました'
                 : '外れ — 標定側で座標を入れ直してください'}
             </span>
+          )}
+        </div>
+      )}
+
+      {/*
+        外れ弾も情報になる。着弾点は自分が撃った座標そのものなので位置が正確で、
+        そこから目標までの距離が報告される。方角も来るが曖昧なので使わない。
+      */}
+      {!verifying && (
+        <div className="card__probe">
+          <span className="card__k">射撃の結果</span>
+          <div className="card__outcome" role="group" aria-label="射撃の結果">
+            <button
+              className={`card__miss${target.outcome === 'miss' ? ' is-on' : ''}`}
+              onClick={onReportMiss}
+              aria-pressed={target.outcome === 'miss'}
+            >
+              不発
+            </button>
+          </div>
+
+          {target.outcome === 'miss' && (
+            <div className="card__impact">
+              <label className="card__impactfield">
+                <span className="card__k">着弾点</span>
+                <input
+                  value={target.impactGrid ?? ''}
+                  onChange={(e) => onImpactGrid(e.target.value)}
+                  placeholder="J3 0:0"
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-label="砲弾が落ちた座標"
+                />
+              </label>
+              <label className="card__impactfield">
+                <span className="card__k">そこから目標まで</span>
+                <input
+                  value={target.impactRangeInput ?? ''}
+                  onChange={(e) => onImpactRange(e.target.value)}
+                  placeholder="km"
+                  inputMode="decimal"
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-label="着弾点から目標までの距離"
+                />
+              </label>
+              <button
+                className="card__record"
+                onClick={onRecordImpact}
+                disabled={(target.impactRangeInput ?? '').trim() === ''}
+              >
+                {target.impactPointId !== undefined ? '記録し直す' : '観測に加える'}
+              </button>
+              {target.impactPointId !== undefined && (
+                <span className="card__verdict">
+                  着弾点を観測元として記録しました。地図に距離の円が出ます
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -9,6 +9,7 @@ import {
 } from '../lib/targets'
 import { Loadout } from './Loadout'
 import { Resupply } from './Resupply'
+import type { Target } from '../lib/targets'
 import { SolutionCard } from './SolutionCard'
 import { TurnIcon } from './TurnIcon'
 import { Turret } from './Turret'
@@ -19,8 +20,11 @@ interface Props {
   onCharge: (id: string, charge: ChargeSetting) => void
   onGun: (id: string, gun: GunSetting) => void
   onImpact: (id: string, digits: string) => void
+  onPatchTarget: (id: string, change: Partial<Target>) => void
   onToggleDone: (id: string) => void
   onReportOutcome: (id: string, outcome: 'hit' | 'miss') => void
+  onReportMiss: (id: string) => void
+  onRecordImpact: (id: string) => void
   /** 観測基準点になっている標定の id。そこへの射撃だけ確認射撃として扱う。 */
   verifyFixIds: ReadonlySet<string>
   onRemove: (id: string) => void
@@ -53,8 +57,11 @@ export function FiringPlan({
   onCharge,
   onGun,
   onImpact,
+  onPatchTarget,
   onToggleDone,
   onReportOutcome,
+  onReportMiss,
+  onRecordImpact,
   verifyFixIds,
   onRemove,
 }: Props) {
@@ -81,8 +88,16 @@ export function FiringPlan({
             onCharge={(charge) => onCharge(step.solution.target.id, charge)}
             onGun={(gun) => onGun(step.solution.target.id, gun)}
             onImpact={(digits) => onImpact(step.solution.target.id, digits)}
+            onImpactRange={(value) =>
+              onPatchTarget(step.solution.target.id, { impactRangeInput: value })
+            }
+            onImpactGrid={(value) =>
+              onPatchTarget(step.solution.target.id, { impactGrid: value })
+            }
             onToggleDone={() => onToggleDone(step.solution.target.id)}
             onReportOutcome={(outcome) => onReportOutcome(step.solution.target.id, outcome)}
+            onReportMiss={() => onReportMiss(step.solution.target.id)}
+            onRecordImpact={() => onRecordImpact(step.solution.target.id)}
             verifying={
               step.solution.target.originFixId !== undefined &&
               verifyFixIds.has(step.solution.target.originFixId)

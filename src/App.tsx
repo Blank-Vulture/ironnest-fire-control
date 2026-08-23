@@ -10,14 +10,16 @@ import {
   type SurveyDoc,
 } from './lib/survey'
 import { firingSolutionFrom } from './lib/triangulate'
-import { formatPoint, pointFrom, type Point } from './lib/grid'
+import { formatPoint, parseGrid, pointFrom, type Point } from './lib/grid'
 import {
   buildPlan,
   newTarget,
+  parseDistance,
   reprojectTarget,
   type Measurement,
   type Target,
 } from './lib/targets'
+import { nextTargetLabel } from './lib/survey'
 
 const TARGETS_KEY = 'iron-nest-timing/v4'
 const SURVEY_KEY = 'iron-nest-timing/survey/v2'
@@ -92,6 +94,9 @@ interface Snapshot {
 }
 
 const UNDO_DEPTH = 20
+
+const makeId = (prefix: string) =>
+  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 
 export function App() {
   const [route, go] = useHashRoute()
@@ -265,6 +270,117 @@ export function App() {
   )
 
   /**
+   * 通常射撃が外れたことを記録する。
+   *
+   * 確認射撃と違って候補の確定には使わない。撃った先が目標でなかった、
+   * というだけの話なので、砲弾が落ちた座標だけを控える。カードの方位と距離は
+   * 標定に追従して動くため、あとから読むと撃った場所とは別の位置になる。
+   */
+  const reportMiss = useCallback(
+    (targetId: string) => {
+      const target = targets.find((t) => t.id === targetId)
+      if (target === undefined) return
+      if (target.outcome === 'miss') {
+        setTargets((prev) =>
+          prev.map((t) => (t.id === targetId ? { ...t, outcome: undefined } : t)),
+        )
+        return
+      }
+      const grid =
+        survey.nest === null
+          ? undefined
+          : (formatPoint(pointFrom(survey.nest, target.bearingDeg, target.distanceKm)) ??
+            undefined)
+      setTargets((prev) =>
+        prev.map((t) => (t.id === targetId ? { ...t, outcome: 'miss', impactGrid: grid } : t)),
+      )
+    },
+    [targets, survey],
+  )
+
+  /**
+   * 外れ弾を観測に変える。
+   *
+   * 着弾点は自分が撃った座標そのものなので、位置は正確に分かっている。
+   * そこから目標までの距離が報告されるなら、着弾点を中心とした距離円が
+   * そのまま新しい観測になる。方角もついてくるが曖昧なので使わない。
+   */
+  const recordImpact = useCallback(
+    (targetId: string) => {
+      const target = targets.find((t) => t.id === targetId)
+      if (target === undefined) return
+      const rangeKm = parseDistance(target.impactRangeInput ?? '')
+      const grid = target.impactGrid ?? ''
+      if (rangeKm === null || parseGrid(grid) === null) return
+
+      remember('着弾からの距離を記録')
+
+      const pointId = target.impactPointId ?? makeId('k')
+      const impactCount = doc.known.filter((k) => k.kind === 'impact').length
+      const point = {
+        id: pointId,
+        label: `着弾 ${target.impactPointId === undefined ? impactCount + 1 : impactCount}`,
+        gridInput: grid,
+        isNest: false,
+        kind: 'impact' as const,
+      }
+
+      setDoc((prev) => {
+        const known = prev.known.some((k) => k.id === pointId)
+          ? prev.known.map((k) => (k.id === pointId ? { ...k, gridInput: grid } : k))
+          : [...prev.known, point]
+
+        // 報告は「この目標までの距離」なので、その目標の標定に足す。
+        // 手で入れたカードには標定が無いので、そのぶんを起こす。
+        const fixId = target.originFixId
+        const sighting = {
+          id: makeId('s'),
+          fromId: pointId,
+          bearingInput: '',
+          rangeInput: String(rangeKm),
+        }
+
+        if (fixId !== undefined && prev.fixes.some((f) => f.id === fixId)) {
+          return {
+            known,
+            fixes: prev.fixes.map((f) =>
+              f.id !== fixId
+                ? f
+                : {
+                    ...f,
+                    sightings: [
+                      ...f.sightings.filter((s) => s.fromId !== pointId),
+                      sighting,
+                    ],
+                  },
+            ),
+          }
+        }
+
+        const next = { known, fixes: prev.fixes }
+        return {
+          known,
+          fixes: [
+            ...prev.fixes,
+            {
+              id: makeId('f'),
+              label: nextTargetLabel(next),
+              sightings: [sighting],
+              isReference: false,
+              isTarget: true,
+            },
+          ],
+        }
+      })
+
+      setTargets((prev) =>
+        prev.map((t) => (t.id === targetId ? { ...t, impactPointId: pointId } : t)),
+      )
+    },
+    [targets, survey, doc, remember],
+  )
+
+  /**
    * 射撃順からカードを消したら、その元になった標定も畳む。
    * ただし他の標定の観測元になっているなら残す。消すと連鎖が切れてしまう。
    */
@@ -366,6 +482,8 @@ export function App() {
           onPatch={patch}
           onToggleDone={toggleDone}
           onReportOutcome={reportOutcome}
+          onReportMiss={reportMiss}
+          onRecordImpact={recordImpact}
           verifyFixIds={verifyFixIds}
           onRemove={removeTarget}
           onClear={() => {

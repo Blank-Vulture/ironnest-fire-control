@@ -246,8 +246,10 @@ export function Plotting({
   const nest = doc.known.find((k) => k.isNest)
   const convoys = doc.known.filter((k) => nest !== undefined && k.parentId === nest.id)
   const loose = doc.known.filter((k) => !k.isNest && k.parentId === undefined)
-  const spotters = loose.filter((k) => k.kind !== 'reference')
+  const spotters = loose.filter((k) => k.kind !== 'reference' && k.kind !== 'impact')
   const references = loose.filter((k) => k.kind === 'reference')
+  // 着弾点も位置が分かっている点なので、基準点と同じ列に並べる
+  const impacts = loose.filter((k) => k.kind === 'impact')
   const selfFix = survey.fixes.find((f) => f.fix.id === NEST_FIX_ID)
   // 実測で座標が定まった標定は、もう推定ではなく既知点として扱える
   const settled = settledFixes(doc)
@@ -419,6 +421,43 @@ export function Plotting({
                   </li>
                 )
               })}
+
+              {/* 外れ弾が落ちた場所。撃った座標そのものなので位置が分かっている */}
+              {impacts.map((point) => (
+                <li
+                  key={point.id}
+                  className="known__row is-impact"
+                  onMouseEnter={() => setHighlight(point.id)}
+                  onMouseLeave={() => setHighlight((h) => (h === point.id ? null : h))}
+                >
+                  <span className="known__mark" aria-hidden>
+                    ✳
+                  </span>
+                  <span className="known__fixed">
+                    {point.label}
+                    <span className="known__from is-impact">着弾</span>
+                  </span>
+                  <input
+                    className="known__grid"
+                    value={point.gridInput}
+                    onChange={(e) => patchKnown(point.id, { gridInput: e.target.value })}
+                    spellCheck={false}
+                    autoComplete="off"
+                    aria-label={`${point.label} の座標`}
+                  />
+                  <button
+                    className="known__remove"
+                    onClick={() => {
+                      onRemember('着弾点を削除')
+                      onChange({ ...doc, known: doc.known.filter((k) => k.id !== point.id) })
+                    }}
+                    title="削除"
+                    aria-label={`${point.label} を削除`}
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
 
               {/* 撃って確かめた標定も、由来が違うだけで同じ基準点 */}
               {settled.map((point) => (
