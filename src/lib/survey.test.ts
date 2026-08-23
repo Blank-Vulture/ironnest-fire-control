@@ -27,7 +27,15 @@ const sighting = (fromId: string, bearing = '', range = ''): Sighting => ({
   rangeInput: range,
 })
 
-const fix = (id: string, sightings: Sighting[]): Fix => ({ id, label: id, sightings })
+const fix = (id: string, sightings: Sighting[], patch: Partial<Fix> = {}): Fix => ({
+  id,
+  label: id,
+  sightings,
+  // 既定では観測元にも使えるようにしておく（連鎖のテストで要る）
+  isReference: true,
+  isTarget: true,
+  ...patch,
+})
 
 /** ある点から目標を見たときの、実際の報告を作る。 */
 const rangeTo = (from: string, target: string) =>
@@ -253,5 +261,87 @@ describe('観測元に選べる点', () => {
       fixes: [fix('a', []), fix('b', [sighting('a', '90')]), fix('c', [sighting('b', '90')])],
     }
     expect(availableSources(doc, 'a').map((p) => p.id)).toEqual([])
+  })
+})
+
+describe('標定の役割', () => {
+  it('観測基準点の印が無い標定は、観測元に出さない', () => {
+    const doc: SurveyDoc = {
+      known: [known('sp1', 'I9 9:1')],
+      fixes: [fix('ref', [], { isReference: false }), fix('t', [])],
+    }
+    expect(availableSources(doc, 't').map((p) => p.id)).toEqual(['sp1'])
+  })
+
+  it('攻撃対象と観測基準点は独立に持てる', () => {
+    // 撃つ相手であり、かつ他を測る基準でもある点
+    const doc: SurveyDoc = {
+      known: [known('sp1', 'I9 9:1')],
+      fixes: [fix('both', [], { isReference: true, isTarget: true }), fix('t', [])],
+    }
+    expect(availableSources(doc, 't').map((p) => p.id)).toEqual(['sp1', 'both'])
+    expect(doc.fixes[0]!.isTarget).toBe(true)
+  })
+})
+
+describe('候補の確定', () => {
+  const target = at('F7 2:5')
+  const s1 = at('I9 9:1')
+  const s2 = at('K4 3:7')
+
+  /** 円 2 つ。交点が 2 箇所に出るので候補が割れる。 */
+  const ambiguous = (patch: Partial<Fix> = {}): SurveyDoc => ({
+    known: [known('sp1', 'I9 9:1'), known('sp2', 'K4 3:7')],
+    fixes: [
+      fix(
+        't',
+        [
+          sighting('sp1', '', distanceBetween(s1, target).toFixed(4)),
+          sighting('sp2', '', distanceBetween(s2, target).toFixed(4)),
+        ],
+        patch,
+      ),
+    ],
+  })
+
+  it('既定では解いた順のまま、候補が 2 つ残る', () => {
+    const entry = solvedFix(solveSurvey(ambiguous()), 't')
+    expect(entry.alternative).not.toBeNull()
+  })
+
+  it('候補 2 を選ぶと、そちらが本命になる', () => {
+    const before = solvedFix(solveSurvey(ambiguous()), 't')
+    const after = solvedFix(solveSurvey(ambiguous({ chosen: 2 })), 't')
+
+    expect(after.position.x).toBeCloseTo(before.alternative!.x, 6)
+    expect(after.position.y).toBeCloseTo(before.alternative!.y, 6)
+  })
+
+  it('確定したら、もう一方は候補として残さない', () => {
+    expect(solvedFix(solveSurvey(ambiguous({ chosen: 2 })), 't').alternative).toBeNull()
+    expect(solvedFix(solveSurvey(ambiguous({ chosen: 1 })), 't').alternative).toBeNull()
+  })
+
+  it('候補 1 を選んでも位置は変わらない', () => {
+    const before = solvedFix(solveSurvey(ambiguous()), 't')
+    const after = solvedFix(solveSurvey(ambiguous({ chosen: 1 })), 't')
+    expect(after.position.x).toBeCloseTo(before.position.x, 6)
+  })
+
+  it('候補が 1 つしか無いときに指定しても壊れない', () => {
+    const doc: SurveyDoc = {
+      known: [known('sp1', 'I9 9:1'), known('sp2', 'K4 3:7')],
+      fixes: [
+        fix(
+          't',
+          [
+            sighting('sp1', bearingTo('I9 9:1', 'F7 2:5')),
+            sighting('sp2', bearingTo('K4 3:7', 'F7 2:5')),
+          ],
+          { chosen: 2 },
+        ),
+      ],
+    }
+    expect(formatPoint(solvedFix(solveSurvey(doc), 't').position)).toBe('F7 2:5')
   })
 })

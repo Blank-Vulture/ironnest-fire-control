@@ -48,11 +48,25 @@ export interface Sighting {
   rangeInput: string
 }
 
-/** 観測から位置を割り出す点。目標にも中間の基準点にもなる。 */
+/**
+ * 観測から位置を割り出す点。
+ *
+ * 目標として撃つのか、他の点を測るための基準として使うのかは別の話で、
+ * 同じ点が両方を兼ねることもある。だから 2 つの役割は独立に持たせる。
+ */
 export interface Fix {
   id: PointId
   label: string
   sightings: Sighting[]
+  /** 他の標定の観測元に使う。オフなら観測元の選択肢に出ない。 */
+  isReference: boolean
+  /** 撃つ相手。オフなら射撃順に送れない（誤って基準点を撃たないための歯止め）。 */
+  isTarget: boolean
+  /**
+   * 候補が 2 つ出たとき、どちらを本命とするか。
+   * 片方へ撃った結果（命中・不発）が分かれば確定できる。
+   */
+  chosen?: 1 | 2
 }
 
 export interface SurveyDoc {
@@ -106,6 +120,7 @@ export function labelOf(doc: SurveyDoc, id: PointId): string {
  * その標定点が観測元にできる点の一覧。
  *
  * 自分自身と、自分を辿ってくる点は輪になるので外す。
+ * 観測基準点として使う印が付いた標定点だけを出す。
  * 補給隊は自機の位置を割り出すためだけの臨時の点なので、目標の観測元には出さない。
  * 自機の現在地を割り出している点も、砲座そのものと同じなので重複させない。
  */
@@ -125,7 +140,9 @@ export function availableSources(doc: SurveyDoc, fixId: PointId): (KnownPoint | 
   }
   return [
     ...doc.known.filter((k) => k.parentId === undefined),
-    ...doc.fixes.filter((f) => !dependents.has(f.id) && f.id !== NEST_FIX_ID),
+    ...doc.fixes.filter(
+      (f) => f.isReference && !dependents.has(f.id) && f.id !== NEST_FIX_ID,
+    ),
   ]
 }
 
@@ -180,14 +197,22 @@ function fromTriangulation(
   }
 
   const { estimate } = result
+
+  // 撃った結果でどちらの候補か決まっているなら、入れ替えて本命にする。
+  // 決まった時点で曖昧さは解けているので、もう一方は候補として残さない。
+  const decided = fix.chosen !== undefined && estimate.alternative !== null
+  const swap = fix.chosen === 2 && estimate.alternative !== null
+  const position = swap ? estimate.alternative! : estimate.position
+  const alternative = decided ? null : estimate.alternative
+
   return {
     fix,
-    status: { kind: 'solved', position: estimate.position, residualKm: estimate.residualKm },
+    status: { kind: 'solved', position, residualKm: estimate.residualKm },
     residualKm: estimate.residualKm,
     // 観測元がすでに推定値なら、その不確かさはそのまま持ち越される
     accumulatedKm: estimate.residualKm + sourceUncertainty,
     chained,
-    alternative: estimate.alternative,
+    alternative,
     crossingAngleDeg: estimate.crossingAngleDeg,
   }
 }

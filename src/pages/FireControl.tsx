@@ -15,6 +15,7 @@ interface Props {
   onAdd: (measurements: Measurement[]) => void
   onPatch: (id: string, change: Partial<Target>) => void
   onToggleDone: (id: string) => void
+  onReportOutcome: (id: string, outcome: 'hit' | 'miss') => void
   onRemove: (id: string) => void
   onClear: () => void
 }
@@ -25,6 +26,7 @@ export function FireControl({
   onAdd,
   onPatch,
   onToggleDone,
+  onReportOutcome,
   onRemove,
   onClear,
 }: Props) {
@@ -39,6 +41,7 @@ export function FireControl({
         onGun={(id, gun: GunSetting) => onPatch(id, { gun })}
         onImpact={(id, impactDigits) => onPatch(id, { impactDigits })}
         onToggleDone={onToggleDone}
+        onReportOutcome={onReportOutcome}
         onRemove={onRemove}
       />
 

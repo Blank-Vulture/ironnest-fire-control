@@ -2,7 +2,8 @@ import { formatPoint } from '../lib/grid'
 import { SHALLOW_CROSSING_DEG, firingSolutionFrom } from '../lib/triangulate'
 import type { Point } from '../lib/grid'
 import type { Fix, KnownPoint, ResolvedFix, Sighting } from '../lib/survey'
-import type { Measurement } from '../lib/targets'
+import type { Measurement, Target } from '../lib/targets'
+import type { TargetOrigin } from '../App'
 
 interface Props {
   resolved: ResolvedFix
@@ -14,7 +15,11 @@ interface Props {
   onAddSighting: () => void
   onRemoveSighting: (sightingId: string) => void
   onRemove: () => void
-  onAddTarget: (measurement: Measurement) => void
+  onAddTarget: (measurement: Measurement, origin?: TargetOrigin) => void
+  onToggleReference: () => void
+  onToggleTarget: () => void
+  /** この標定から出した射撃順のカード。状態をここに映す。 */
+  linked: readonly Target[]
 }
 
 /** m 単位に丸めて出す。km で出すと桁が読みづらい。 */
@@ -30,8 +35,26 @@ export function FixCard({
   onRemoveSighting,
   onRemove,
   onAddTarget,
+  onToggleReference,
+  onToggleTarget,
+  linked,
 }: Props) {
   const { fix, status } = resolved
+  const cardFor = (candidate: 1 | 2) => linked.find((t) => (t.candidate ?? 1) === candidate)
+  /**
+   * 射撃順での様子。撃ち終えたかどうかと、当たったかどうかは別の話なので
+   * 両方を並べる。
+   */
+  const stateOf = (candidate: 1 | 2) => {
+    const card = cardFor(candidate)
+    if (card === undefined) return []
+    const badges: { label: string; tone: string }[] = [
+      card.done ? { label: '完了', tone: 'done' } : { label: '射撃順', tone: 'queued' },
+    ]
+    if (card.outcome === 'hit') badges.push({ label: '命中', tone: 'hit' })
+    if (card.outcome === 'miss') badges.push({ label: '不発', tone: 'miss' })
+    return badges
+  }
   const position = status.kind === 'solved' ? status.position : null
   const solution = position !== null && nest !== null ? firingSolutionFrom(nest, position) : null
   const altSolution =
@@ -55,12 +78,25 @@ export function FixCard({
         <span className="fix__position">
           {position !== null ? (formatPoint(position) ?? 'マップ外') : '—'}
           {resolved.alternative !== null && <span className="fix__cand">候補地 1</span>}
+          <Badges states={stateOf(1)} />
         </span>
 
         <button className="fix__remove" onClick={onRemove} aria-label={`${fix.label} を削除`}>
           ✕
         </button>
       </header>
+
+      {/* 撃つ相手なのか、他を測るための基準なのか。同じ点が両方を兼ねることもある */}
+      <div className="fix__roles">
+        <label className="role">
+          <input type="checkbox" checked={fix.isReference} onChange={onToggleReference} />
+          観測基準点
+        </label>
+        <label className="role">
+          <input type="checkbox" checked={fix.isTarget} onChange={onToggleTarget} />
+          攻撃対象
+        </label>
+      </div>
 
       <ol className="fix__sightings">
         <li className="sight sight--header" aria-hidden>
@@ -132,6 +168,7 @@ export function FixCard({
           <strong className="fix__altgrid">
             {formatPoint(resolved.alternative) ?? 'マップ外'}
           </strong>
+          <Badges states={stateOf(2)} />
           {altSolution !== null && (
             <>
               <span className="fix__altsolution">
@@ -139,15 +176,23 @@ export function FixCard({
               </span>
               <button
                 className="fix__try"
-                title="こちらへ 1 発撃って、当たるかどうかで候補を絞る"
+                title={
+                  fix.isTarget
+                    ? 'こちらへ 1 発撃って、当たるかどうかで候補を絞る'
+                    : '攻撃対象に印を付けると撃てます'
+                }
+                disabled={!fix.isTarget || cardFor(2) !== undefined}
                 onClick={() =>
-                  onAddTarget({
-                    bearingDeg: altSolution.bearingDeg,
-                    distanceKm: altSolution.distanceKm,
-                  })
+                  onAddTarget(
+                    {
+                      bearingDeg: altSolution.bearingDeg,
+                      distanceKm: altSolution.distanceKm,
+                    },
+                    { fixId: fix.id, candidate: 2 },
+                  )
                 }
               >
-                撃って確かめる
+                {cardFor(2) !== undefined ? '追加済み' : '撃って確かめる'}
               </button>
             </>
           )}
@@ -170,11 +215,16 @@ export function FixCard({
           {solution !== null && (
             <button
               className="fix__use"
+              disabled={!fix.isTarget || cardFor(1) !== undefined}
+              title={fix.isTarget ? undefined : '攻撃対象に印を付けると射撃順に送れます'}
               onClick={() =>
-                onAddTarget({ bearingDeg: solution.bearingDeg, distanceKm: solution.distanceKm })
+                onAddTarget(
+                  { bearingDeg: solution.bearingDeg, distanceKm: solution.distanceKm },
+                  { fixId: fix.id, candidate: 1 },
+                )
               }
             >
-              射撃順に追加
+              {cardFor(1) !== undefined ? '追加済み' : '射撃順に追加'}
             </button>
           )}
         </footer>
@@ -240,5 +290,17 @@ function FixStatusLine({ resolved, shallow }: { resolved: ResolvedFix; shallow: 
         </p>
       )}
     </div>
+  )
+}
+
+function Badges({ states }: { states: { label: string; tone: string }[] }) {
+  return (
+    <>
+      {states.map((state) => (
+        <span key={state.label} className={`fix__badge is-${state.tone}`}>
+          {state.label}
+        </span>
+      ))}
+    </>
   )
 }

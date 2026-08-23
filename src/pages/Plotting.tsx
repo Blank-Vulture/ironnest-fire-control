@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { FixCard } from '../components/FixCard'
 import { GridMap } from '../components/GridMap'
 import { NestPanel } from '../components/NestPanel'
@@ -17,18 +17,24 @@ import { planConvoyRequest } from '../lib/convoy'
 import {
   NEST_FIX_ID,
   availableSources,
-  solveSurvey,
+  type SurveyResult,
   type Fix,
   type KnownPoint,
   type Sighting,
   type SurveyDoc,
 } from '../lib/survey'
-import type { Measurement } from '../lib/targets'
+import type { Measurement, Target } from '../lib/targets'
+import type { TargetOrigin } from '../App'
 
 interface Props {
   doc: SurveyDoc
+  /** 解は両方の画面で使うので、外で一度だけ解いたものを受け取る。 */
+  survey: SurveyResult
+  /** 射撃順の中身。標定が今どうなっているかを出すために見る。 */
+  targets: readonly Target[]
   onChange: (doc: SurveyDoc) => void
-  onAddTarget: (measurement: Measurement) => void
+  onAddTarget: (measurement: Measurement, origin?: TargetOrigin) => void
+  onRemoveFix: (fixId: string) => void
   /** 砲座が動いたことを伝える。射撃順の目標を新しい位置から測り直すため。 */
   onNestMoved: (from: Point, to: Point) => void
 }
@@ -45,7 +51,14 @@ export function newSighting(): Sighting {
 }
 
 export function newFix(index: number): Fix {
-  return { id: id('f'), label: `目標 ${index}`, sightings: [newSighting(), newSighting()] }
+  return {
+    id: id('f'),
+    label: `目標 ${index}`,
+    sightings: [newSighting(), newSighting()],
+    isReference: false,
+    // 撃つために作ることがほとんどなので、攻撃対象は既定でオン
+    isTarget: true,
+  }
 }
 
 export const NEST_LABEL = 'IRON NEST'
@@ -71,12 +84,18 @@ export function emptySurveyDoc(): SurveyDoc {
  * 「距離が重なる地点をまず出し、そこからの方位で目標を出す」という
  * 段を重ねた任務がそのまま組める。
  */
-export function Plotting({ doc, onChange, onAddTarget, onNestMoved }: Props) {
+export function Plotting({
+  doc,
+  survey,
+  targets,
+  onChange,
+  onAddTarget,
+  onRemoveFix,
+  onNestMoved,
+}: Props) {
   const [pasteError, setPasteError] = useState<string[]>([])
   const [highlight, setHighlight] = useState<string | null>(null)
   const [nestOpen, setNestOpen] = useState(true)
-
-  const survey = useMemo(() => solveSurvey(doc), [doc])
 
   const patchKnown = (pointId: string, change: Partial<KnownPoint>) =>
     onChange({ ...doc, known: doc.known.map((k) => (k.id === pointId ? { ...k, ...change } : k)) })
@@ -169,6 +188,9 @@ export function Plotting({ doc, onChange, onAddTarget, onNestMoved }: Props) {
     const nestFix: Fix = {
       id: NEST_FIX_ID,
       label: previous?.label ?? 'IRON NEST 現在地',
+      // 自機の位置そのものなので、撃つ相手にも観測元にもしない
+      isReference: false,
+      isTarget: false,
       // 要請を出し直したら報告も取り直しになるので、値は空にしておく
       sightings: convoys.map((convoy, i) => ({
         id: previous?.sightings[i]?.id ?? id('s'),
@@ -211,6 +233,7 @@ export function Plotting({ doc, onChange, onAddTarget, onNestMoved }: Props) {
         survey={survey}
         highlight={highlight}
         onHighlight={setHighlight}
+        targets={targets}
         // 区画を畳んだら、その足場も地図から退ける
         hidden={
           nestOpen
@@ -347,10 +370,15 @@ export function Plotting({ doc, onChange, onAddTarget, onNestMoved }: Props) {
                   sightings: resolved.fix.sightings.filter((s) => s.id !== sightingId),
                 })
               }
-              onRemove={() =>
-                onChange({ ...doc, fixes: doc.fixes.filter((f) => f.id !== resolved.fix.id) })
-              }
+              onRemove={() => onRemoveFix(resolved.fix.id)}
               onAddTarget={onAddTarget}
+              onToggleReference={() =>
+                patchFix(resolved.fix.id, { isReference: !resolved.fix.isReference })
+              }
+              onToggleTarget={() =>
+                patchFix(resolved.fix.id, { isTarget: !resolved.fix.isTarget })
+              }
+              linked={targets.filter((t) => t.originFixId === resolved.fix.id)}
             />
           ))}
         </div>

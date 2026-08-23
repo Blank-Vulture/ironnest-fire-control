@@ -12,6 +12,7 @@ interface Props {
   onGun: (gun: GunSetting) => void
   onImpact: (digits: string) => void
   onToggleDone: () => void
+  onReportOutcome: (outcome: 'hit' | 'miss') => void
   onRemove: () => void
 }
 
@@ -27,6 +28,7 @@ export function SolutionCard({
   onGun,
   onImpact,
   onToggleDone,
+  onReportOutcome,
   onRemove,
 }: Props) {
   const { solution, order, gun } = step
@@ -168,6 +170,41 @@ export function SolutionCard({
         </label>
 
       </div>
+
+      {/*
+        候補が 2 つあるうちの片方を撃つカード。当たったか外れたかが分かれば、
+        標定の候補はそこで 1 つに決まる。
+      */}
+      {target.candidate !== undefined && (
+        <div className="card__probe">
+          {/* 候補は確定すると入れ替わるので、番号で呼ばない。
+              「撃った結果どうだったか」だけを聞く。 */}
+          <span className="card__k">確認射撃</span>
+          <div className="card__outcome" role="group" aria-label="射撃の結果">
+            <button
+              className={`card__hit${target.outcome === 'hit' ? ' is-on' : ''}`}
+              onClick={() => onReportOutcome('hit')}
+              aria-pressed={target.outcome === 'hit'}
+            >
+              命中
+            </button>
+            <button
+              className={`card__miss${target.outcome === 'miss' ? ' is-on' : ''}`}
+              onClick={() => onReportOutcome('miss')}
+              aria-pressed={target.outcome === 'miss'}
+            >
+              不発
+            </button>
+          </div>
+          {target.outcome !== undefined && (
+            <span className="card__verdict">
+              {target.outcome === 'hit'
+                ? 'この位置で確定しました'
+                : '外れ — もう一方が本命として確定しました'}
+            </span>
+          )}
+        </div>
+      )}
 
       <footer className={`card__launch${solution.launch === null ? ' is-empty' : ''}`}>
         <span className="card__k">発射時刻</span>

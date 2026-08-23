@@ -6,7 +6,7 @@ import {
   pointFrom,
   type Point,
 } from '../lib/grid'
-import { parseBearing, parseDistance } from '../lib/targets'
+import { parseBearing, parseDistance, type Target } from '../lib/targets'
 import { NEST_FIX_ID, type SurveyDoc, type SurveyResult } from '../lib/survey'
 
 interface Props {
@@ -17,6 +17,8 @@ interface Props {
   onHighlight: (id: string | null) => void
   /** 描かない点。畳んだ区画の足場を地図にも出さないために使う。 */
   hidden?: ReadonlySet<string>
+  /** 射撃順の中身。撃ち終えた標定を見分けるために見る。 */
+  targets: readonly Target[]
 }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRST'
@@ -68,6 +70,8 @@ interface Marker {
   name: string
   at: Point
   color: string
+  /** 撃ち終えた点。印に取り消しの輪を重ねる。 */
+  struck?: boolean
 }
 
 /**
@@ -80,8 +84,12 @@ interface Marker {
  * 拡大しても点や字が膨らまないよう、印と文字の大きさは倍率から逆算して
  * 画面上で一定に保つ。線は vector-effect で太さを固定する。
  */
-export function GridMap({ doc, survey, highlight, onHighlight, hidden }: Props) {
+export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }: Props) {
   const isHidden = (id: string) => hidden?.has(id) === true
+
+  /** その標定を撃ち終えたか。ゲーム内で撃破に印が付くのと同じ扱いにする。 */
+  const struck = (fixId: string) =>
+    targets.some((t) => t.originFixId === fixId && (t.done || t.outcome === 'hit'))
   const wrapRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<ViewBox>(FULL_VIEW)
   const [width, setWidth] = useState(900)
@@ -169,6 +177,7 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden }: Props) 
       name: ambiguous ? `${resolved.fix.label}（候補地 1）` : resolved.fix.label,
       at: resolved.status.position,
       color: self ? 'var(--accent)' : HOSTILE,
+      struck: struck(resolved.fix.id),
     })
     if (resolved.alternative !== null) {
       markers.push({
@@ -418,7 +427,9 @@ function Pin({ marker, px, active, dim, onEnter, onLeave, onPick }: PinProps) {
 
   return (
     <g
-      className={`pin pin--${kind}${active ? ' is-active' : ''}${dim ? ' is-dim' : ''}`}
+      className={`pin pin--${kind}${active ? ' is-active' : ''}${dim ? ' is-dim' : ''}${
+        marker.struck === true ? ' is-struck' : ''
+      }`}
       style={{ color: marker.color }}
       onPointerEnter={onEnter}
       onPointerLeave={onLeave}
@@ -441,6 +452,11 @@ function Pin({ marker, px, active, dim, onEnter, onLeave, onPick }: PinProps) {
         />
       )}
       {kind === 'alt' && <circle className="pin__alt" cx={cx} cy={cy} r={px(11)} />}
+
+      {/* 撃ち終えた印。ゲーム内で撃破に札が置かれるのに合わせる */}
+      {marker.struck === true && (
+        <circle className="pin__struck" cx={cx} cy={cy} r={px(15)} />
+      )}
 
       <text
         className="pin__name"

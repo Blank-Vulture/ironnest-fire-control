@@ -20,6 +20,7 @@ interface Props {
   onGun: (id: string, gun: GunSetting) => void
   onImpact: (id: string, digits: string) => void
   onToggleDone: (id: string) => void
+  onReportOutcome: (id: string, outcome: 'hit' | 'miss') => void
   onRemove: (id: string) => void
 }
 
@@ -51,6 +52,7 @@ export function FiringPlan({
   onGun,
   onImpact,
   onToggleDone,
+  onReportOutcome,
   onRemove,
 }: Props) {
   const { steps, totalTurnDeg, unplaced, done } = plan
@@ -77,6 +79,7 @@ export function FiringPlan({
             onGun={(gun) => onGun(step.solution.target.id, gun)}
             onImpact={(digits) => onImpact(step.solution.target.id, digits)}
             onToggleDone={() => onToggleDone(step.solution.target.id)}
+            onReportOutcome={(outcome) => onReportOutcome(step.solution.target.id, outcome)}
             onRemove={() => onRemove(step.solution.target.id)}
           />
         </>
