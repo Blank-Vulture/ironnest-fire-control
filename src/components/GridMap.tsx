@@ -295,8 +295,8 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
 
   const fit = () => setView(FULL_VIEW)
 
-  // 全体を映しているうちは縦スクロールをページに譲る。地図はページの上の方に
-  // あるので、指が地図に乗っただけでスクロールできなくなると詰む。
+  // 全体を映しているうちは縦スクロールをページに譲る。幅いっぱいの面なので、
+  // 指が地図に乗っただけでページを送れなくなると詰む。
   // 寄せてからは地図が指を受け取り、上下にも動かせるようにする。
   const zoomedIn = view.w < MAX_SPAN - 0.01
 

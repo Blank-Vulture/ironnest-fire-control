@@ -62,15 +62,24 @@ export function newReferencePoint(doc: SurveyDoc): KnownPoint {
   }
 }
 
-export function newSighting(): Sighting {
-  return { id: id('s'), fromId: '', bearingInput: '', rangeInput: '' }
+/** 報告を寄こすのはたいてい観測員なので、健在な観測員を順に既定にする。 */
+function defaultSources(doc: SurveyDoc): string[] {
+  return doc.known
+    .filter((k) => !k.isNest && k.parentId === undefined && k.kind !== 'reference' && k.lost !== true)
+    .map((k) => k.id)
+}
+
+export function newSighting(fromId = ''): Sighting {
+  return { id: id('s'), fromId, bearingInput: '', rangeInput: '' }
 }
 
 export function newFix(doc: SurveyDoc): Fix {
+  const [first, second] = defaultSources(doc)
   return {
     id: id('f'),
     label: nextTargetLabel(doc),
-    sightings: [newSighting(), newSighting()],
+    // 位置を決めるには 2 つ要るので、別々の観測員を初めから当てておく
+    sightings: [newSighting(first), newSighting(second ?? first)],
     isReference: false,
     // 撃つために作ることがほとんどなので、攻撃対象は既定でオン
     isTarget: true,
@@ -256,20 +265,6 @@ export function Plotting({
 
   return (
     <>
-      <GridMap
-        doc={doc}
-        survey={survey}
-        highlight={highlight}
-        onHighlight={setHighlight}
-        targets={targets}
-        // 区画を畳んだら、その足場も地図から退ける
-        hidden={
-          nestOpen
-            ? undefined
-            : new Set<string>([NEST_FIX_ID, ...convoys.map((c) => c.id)])
-        }
-      />
-
       {nest !== undefined && (
         <NestPanel
           open={nestOpen}
@@ -484,6 +479,20 @@ export function Plotting({
         )}
       </section>
 
+      <GridMap
+        doc={doc}
+        survey={survey}
+        highlight={highlight}
+        onHighlight={setHighlight}
+        targets={targets}
+        // 区画を畳んだら、その足場も地図から退ける
+        hidden={
+          nestOpen
+            ? undefined
+            : new Set<string>([NEST_FIX_ID, ...convoys.map((c) => c.id)])
+        }
+      />
+
       <section className="fixes">
         <div className="known__head">
           <h2 className="section__title">標定</h2>
@@ -509,7 +518,16 @@ export function Plotting({
               }
               onAddSighting={() =>
                 patchFix(resolved.fix.id, {
-                  sightings: [...resolved.fix.sightings, newSighting()],
+                  sightings: [
+                    ...resolved.fix.sightings,
+                    // まだ使っていない観測員がいれば、それを既定にする
+                    newSighting(
+                      defaultSources(doc).find(
+                        (candidate) =>
+                          !resolved.fix.sightings.some((s) => s.fromId === candidate),
+                      ),
+                    ),
+                  ],
                 })
               }
               onRemoveSighting={(sightingId) =>
