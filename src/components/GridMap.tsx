@@ -15,6 +15,8 @@ interface Props {
   /** 外から指している点（既知点の一覧にホバーしたときなど）。 */
   highlight: string | null
   onHighlight: (id: string | null) => void
+  /** 描かない点。畳んだ区画の足場を地図にも出さないために使う。 */
+  hidden?: ReadonlySet<string>
 }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRST'
@@ -78,7 +80,8 @@ interface Marker {
  * 拡大しても点や字が膨らまないよう、印と文字の大きさは倍率から逆算して
  * 画面上で一定に保つ。線は vector-effect で太さを固定する。
  */
-export function GridMap({ doc, survey, highlight, onHighlight }: Props) {
+export function GridMap({ doc, survey, highlight, onHighlight, hidden }: Props) {
+  const isHidden = (id: string) => hidden?.has(id) === true
   const wrapRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<ViewBox>(FULL_VIEW)
   const [width, setWidth] = useState(900)
@@ -120,9 +123,10 @@ export function GridMap({ doc, survey, highlight, onHighlight }: Props) {
   const circles: { id: string; fromId: string; at: Point; radius: number; color: string }[] = []
 
   for (const fix of doc.fixes) {
+    if (isHidden(fix.id)) continue
     for (const sight of fix.sightings) {
       const from = survey.positions.get(sight.fromId)
-      if (from === undefined) continue
+      if (from === undefined || isHidden(sight.fromId)) continue
       const color = colorOf(sight.fromId)
 
       const bearingDeg = parseBearing(sight.bearingInput)
@@ -145,7 +149,7 @@ export function GridMap({ doc, survey, highlight, onHighlight }: Props) {
   const markers: Marker[] = []
   for (const point of doc.known) {
     const at = survey.positions.get(point.id)
-    if (at === undefined) continue
+    if (at === undefined || isHidden(point.id)) continue
     markers.push({
       id: point.id,
       kind: point.isNest ? 'nest' : 'known',
@@ -155,7 +159,7 @@ export function GridMap({ doc, survey, highlight, onHighlight }: Props) {
     })
   }
   for (const resolved of survey.fixes) {
-    if (resolved.status.kind !== 'solved') continue
+    if (resolved.status.kind !== 'solved' || isHidden(resolved.fix.id)) continue
     const ambiguous = resolved.alternative !== null
     // 自機の現在地を割り出している点だけは敵ではないので、自機の色で描く
     const self = resolved.fix.id === NEST_FIX_ID

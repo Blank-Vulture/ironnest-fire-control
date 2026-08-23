@@ -3,6 +3,9 @@ import { SHALLOW_CROSSING_DEG } from '../lib/triangulate'
 import type { KnownPoint, ResolvedFix, Sighting } from '../lib/survey'
 
 interface Props {
+  /** 開いているか。現在地を確定させたら畳んで、地図と画面から退く。 */
+  open: boolean
+  onToggle: () => void
   nest: KnownPoint
   /** 位置報告を頼んだ補給隊。要請していなければ空。 */
   convoys: KnownPoint[]
@@ -27,6 +30,8 @@ const metres = (km: number) => `${(km * 1000).toFixed(0)} m`
  * 位置の割り出しをここにまとめている。
  */
 export function NestPanel({
+  open,
+  onToggle,
   nest,
   convoys,
   selfFix,
@@ -45,12 +50,21 @@ export function NestPanel({
     selfFix?.crossingAngleDeg != null && selfFix.crossingAngleDeg < SHALLOW_CROSSING_DEG
 
   return (
-    <section className="nest">
-      <div className="nest__head">
-        <h2 className="section__title">IRON NEST</h2>
-        <span className="section__hint">射撃諸元はこの位置から計算されます</span>
-      </div>
+    <section className={`nest${open ? ' is-open' : ''}`}>
+      <button className="nest__toggle" onClick={onToggle} aria-expanded={open}>
+        <span className="nest__caret" aria-hidden>
+          {open ? '▾' : '▸'}
+        </span>
+        <span className="section__title">IRON NEST</span>
+        {open ? (
+          <span className="section__hint">射撃諸元はこの位置から計算されます</span>
+        ) : (
+          <span className="nest__folded">{nest.gridInput || '座標未設定'}</span>
+        )}
+      </button>
 
+      {!open ? null : (
+      <>
       <div className="nest__current">
         {/* 地図を暗転させる範囲は座標欄だけに絞る。
             ボタンに手を伸ばしただけで地図が沈むと目障りになる。 */}
@@ -187,6 +201,8 @@ export function NestPanel({
             </p>
           )}
         </div>
+      )}
+      </>
       )}
     </section>
   )

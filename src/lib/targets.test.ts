@@ -7,10 +7,12 @@ import {
   parseMeasurement,
   pairSteps,
   parseMeasurements,
+  reprojectTarget,
   resupplyQueue,
   solveTarget,
   type Target,
 } from './targets'
+import { pointFrom } from './grid'
 import { formatTimeOfDay } from './time'
 
 const at = (bearingDeg: number, distanceKm: number, patch: Partial<Target> = {}): Target => ({
@@ -584,5 +586,49 @@ describe('撃った後の境界（0 度をまたぐ引き継ぎ）', () => {
   it('砲塔が目標と同じ方位なら、最初の旋回は 0 になる', () => {
     const plan = buildPlan([firedAt(359.9), at(359.9, 5), at(10, 5)])
     expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(0)
+  })
+})
+
+describe('砲座が動いたとき', () => {
+  const nestA = { x: 8.55, y: 5.35 }
+  const nestB = { x: 10.25, y: 3.05 }
+
+  it('目標の盤面上の位置は動かない', () => {
+    const target = at(273.9, 6.16)
+    const moved = reprojectTarget(target, nestA, nestB)
+    const before = pointFrom(nestA, target.bearingDeg, target.distanceKm)
+    const after = pointFrom(nestB, moved.bearingDeg, moved.distanceKm)
+    expect(after.x).toBeCloseTo(before.x, 9)
+    expect(after.y).toBeCloseTo(before.y, 9)
+  })
+
+  it('方位も距離も新しい位置から測り直される', () => {
+    const moved = reprojectTarget(at(0, 3), nestA, nestB)
+    expect(moved.bearingDeg).not.toBeCloseTo(0)
+    expect(moved.distanceKm).not.toBeCloseTo(3)
+  })
+
+  it('砲座が動いていなければ何も変わらない', () => {
+    const target = at(137.5, 4.2)
+    const moved = reprojectTarget(target, nestA, nestA)
+    expect(moved.bearingDeg).toBeCloseTo(target.bearingDeg, 9)
+    expect(moved.distanceKm).toBeCloseTo(target.distanceKm, 9)
+  })
+
+  it('弾種や着弾時刻などはそのまま残る', () => {
+    const target = at(90, 5, { shell: 'AP', charge: 4, impactDigits: '101010', done: true })
+    const moved = reprojectTarget(target, nestA, nestB)
+    expect(moved.shell).toBe('AP')
+    expect(moved.charge).toBe(4)
+    expect(moved.impactDigits).toBe('101010')
+    expect(moved.done).toBe(true)
+    expect(moved.id).toBe(target.id)
+  })
+
+  it('往復させると元に戻る', () => {
+    const target = at(273.9, 6.16)
+    const round = reprojectTarget(reprojectTarget(target, nestA, nestB), nestB, nestA)
+    expect(round.bearingDeg).toBeCloseTo(target.bearingDeg, 6)
+    expect(round.distanceKm).toBeCloseTo(target.distanceKm, 9)
   })
 })

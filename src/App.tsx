@@ -3,7 +3,14 @@ import { ROUTES, ROUTE_TITLE, useHashRoute } from './lib/route'
 import { emptySurveyDoc, Plotting } from './pages/Plotting'
 import { FireControl } from './pages/FireControl'
 import type { SurveyDoc } from './lib/survey'
-import { buildPlan, newTarget, type Measurement, type Target } from './lib/targets'
+import type { Point } from './lib/grid'
+import {
+  buildPlan,
+  newTarget,
+  reprojectTarget,
+  type Measurement,
+  type Target,
+} from './lib/targets'
 
 const TARGETS_KEY = 'iron-nest-timing/v4'
 const SURVEY_KEY = 'iron-nest-timing/survey/v2'
@@ -98,6 +105,17 @@ export function App() {
     [plan],
   )
 
+  /**
+   * 砲座が動いたら、射撃順の目標を新しい位置から測り直す。
+   * 目標は砲座から見た方位と距離でしか持っていないので、そのままでは
+   * 古い位置を基準にした値が残ってしまう。
+   */
+  const reprojectAll = useCallback(
+    (from: Point, to: Point) =>
+      setTargets((prev) => prev.map((t) => reprojectTarget(t, from, to))),
+    [],
+  )
+
   /** 標定した点を射撃順へ送る。送ったら射撃管制の画面に切り替える。 */
   const sendToFireControl = useCallback(
     (measurement: Measurement) => {
@@ -136,7 +154,12 @@ export function App() {
       </nav>
 
       {route === 'plotting' ? (
-        <Plotting doc={survey} onChange={setSurvey} onAddTarget={sendToFireControl} />
+        <Plotting
+          doc={survey}
+          onChange={setSurvey}
+          onAddTarget={sendToFireControl}
+          onNestMoved={reprojectAll}
+        />
       ) : (
         <FireControl
           plan={plan}

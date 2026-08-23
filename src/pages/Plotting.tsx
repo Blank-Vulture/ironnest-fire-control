@@ -11,6 +11,7 @@ import {
   isNestLabel,
   parseGrid,
   parseRoster,
+  type Point,
 } from '../lib/grid'
 import { planConvoyRequest } from '../lib/convoy'
 import {
@@ -28,6 +29,8 @@ interface Props {
   doc: SurveyDoc
   onChange: (doc: SurveyDoc) => void
   onAddTarget: (measurement: Measurement) => void
+  /** 砲座が動いたことを伝える。射撃順の目標を新しい位置から測り直すため。 */
+  onNestMoved: (from: Point, to: Point) => void
 }
 
 const id = (prefix: string) =>
@@ -68,9 +71,10 @@ export function emptySurveyDoc(): SurveyDoc {
  * 「距離が重なる地点をまず出し、そこからの方位で目標を出す」という
  * 段を重ねた任務がそのまま組める。
  */
-export function Plotting({ doc, onChange, onAddTarget }: Props) {
+export function Plotting({ doc, onChange, onAddTarget, onNestMoved }: Props) {
   const [pasteError, setPasteError] = useState<string[]>([])
   const [highlight, setHighlight] = useState<string | null>(null)
+  const [nestOpen, setNestOpen] = useState(true)
 
   const survey = useMemo(() => solveSurvey(doc), [doc])
 
@@ -110,16 +114,28 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
     setPasteError(bad)
   }
 
-  /** 標定できた点を IRON NEST の現在地として書き込む。緊急移動のあとに使う。 */
+  /**
+   * 標定できた点を IRON NEST の現在地として書き込む。緊急移動のあとに使う。
+   *
+   * 射撃順の目標は「砲座から見た方位と距離」でしか持っていないので、
+   * 砲座が動いたぶんを測り直さないと古い位置を基準にしたままずれる。
+   * 書き込みと同時に振り直したうえで、役目を終えた区画を畳む。
+   */
   const adoptAsNest = (fixId: string) => {
     const resolved = survey.fixes.find((f) => f.fix.id === fixId)
     if (resolved?.status.kind !== 'solved') return
     const grid = formatPoint(resolved.status.position)
     if (grid === null) return
+
+    const before = survey.nest
+    const after = resolved.status.position
+    if (before !== null) onNestMoved(before, after)
+
     onChange({
       ...doc,
       known: doc.known.map((k) => (k.isNest ? { ...k, gridInput: grid } : k)),
     })
+    setNestOpen(false)
   }
 
   /**
@@ -195,10 +211,18 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
         survey={survey}
         highlight={highlight}
         onHighlight={setHighlight}
+        // 区画を畳んだら、その足場も地図から退ける
+        hidden={
+          nestOpen
+            ? undefined
+            : new Set<string>([NEST_FIX_ID, ...convoys.map((c) => c.id)])
+        }
       />
 
       {nest !== undefined && (
         <NestPanel
+          open={nestOpen}
+          onToggle={() => setNestOpen((o) => !o)}
           nest={nest}
           convoys={convoys}
           selfFix={selfFix}

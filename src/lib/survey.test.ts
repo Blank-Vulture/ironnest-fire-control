@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { bearingBetween, distanceBetween, formatPoint, gridToPoint, parseGrid } from './grid'
 import {
+  NEST_FIX_ID,
   availableSources,
   solveSurvey,
   type Fix,
@@ -208,6 +209,28 @@ describe('観測元に選べる点', () => {
       fixes: [fix('t', [])],
     }
     expect(availableSources(doc, 't').map((p) => p.id)).toEqual(['sp1', 'sp2'])
+  })
+
+  it('補給隊は目標の観測元には出さない', () => {
+    // 補給隊は自機の位置を割り出すためだけの臨時の点
+    const doc: SurveyDoc = {
+      known: [
+        known('nest', 'I6 5:3', true),
+        known('sp1', 'I9 9:1'),
+        { ...known('c1', 'M2'), parentId: 'nest' },
+        { ...known('c2', 'F2'), parentId: 'nest' },
+      ],
+      fixes: [fix('t', [])],
+    }
+    expect(availableSources(doc, 't').map((p) => p.id)).toEqual(['nest', 'sp1'])
+  })
+
+  it('自機の現在地を割り出す標定も観測元には出さない', () => {
+    const doc: SurveyDoc = {
+      known: [known('sp1', 'I9 9:1')],
+      fixes: [fix(NEST_FIX_ID, []), fix('t', [])],
+    }
+    expect(availableSources(doc, 't').map((p) => p.id)).toEqual(['sp1'])
   })
 
   it('自分自身は選べない', () => {

@@ -102,7 +102,13 @@ export function labelOf(doc: SurveyDoc, id: PointId): string {
   )
 }
 
-/** その標定点が観測元にできる点の一覧。自分自身と、自分に依存する点は除く。 */
+/**
+ * その標定点が観測元にできる点の一覧。
+ *
+ * 自分自身と、自分を辿ってくる点は輪になるので外す。
+ * 補給隊は自機の位置を割り出すためだけの臨時の点なので、目標の観測元には出さない。
+ * 自機の現在地を割り出している点も、砲座そのものと同じなので重複させない。
+ */
 export function availableSources(doc: SurveyDoc, fixId: PointId): (KnownPoint | Fix)[] {
   const dependents = new Set<PointId>([fixId])
   // 自分を辿ってくる点を集める。これらを観測元にすると輪になる。
@@ -117,7 +123,10 @@ export function availableSources(doc: SurveyDoc, fixId: PointId): (KnownPoint | 
       }
     }
   }
-  return [...doc.known, ...doc.fixes.filter((f) => !dependents.has(f.id))]
+  return [
+    ...doc.known.filter((k) => k.parentId === undefined),
+    ...doc.fixes.filter((f) => !dependents.has(f.id) && f.id !== NEST_FIX_ID),
+  ]
 }
 
 function knownPositions(known: readonly KnownPoint[]): Map<PointId, Point> {

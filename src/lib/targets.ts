@@ -13,6 +13,12 @@
  */
 
 import {
+  bearingBetween,
+  distanceBetween,
+  pointFrom,
+  type Point,
+} from './grid'
+import {
   bearingDelta,
   elevationDeg,
   flightSeconds,
@@ -374,4 +380,22 @@ export function pairSteps(steps: readonly PlanStep[]): PlanRow[] {
  */
 export function resupplyQueue(steps: readonly PlanStep[], side: Side): PlanStep[] {
   return steps.filter((step) => step.gun === side && step.needsResupply)
+}
+
+/* ---------- 砲座が動いたとき ---------- */
+
+/**
+ * 砲座が動いたぶん、目標の方位と距離を測り直す。
+ *
+ * 目標は「砲座から見た方位と距離」でしか持っていないので、砲座が動くと
+ * その値は古い位置を基準にしたままずれる。いったん盤面の座標に戻してから、
+ * 新しい位置で測り直す。目標そのものは動いていないので、盤面の座標は変わらない。
+ */
+export function reprojectTarget(target: Target, from: Point, to: Point): Target {
+  const absolute = pointFrom(from, target.bearingDeg, target.distanceKm)
+  return {
+    ...target,
+    bearingDeg: bearingBetween(to, absolute),
+    distanceKm: distanceBetween(to, absolute),
+  }
 }
