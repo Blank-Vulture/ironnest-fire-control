@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { SIDES, SIDE_LABEL, type Side } from '../lib/guns'
+import { READY_ROUNDS_PER_GUN, SIDES, SIDE_LABEL, type Side } from '../lib/guns'
 import type { ShellCode } from '../lib/shells'
 import type { PlanStep } from '../lib/targets'
 import { ShellRound } from './ShellRound'
@@ -10,11 +10,17 @@ interface Props {
   steps: readonly PlanStep[]
 }
 
-/** 揚弾筒 1 基あたりの即応弾数。砲座には 2 基あって計 12 発。 */
-const READY_ROUNDS = 6
-
 /** 弾 1 発ぶんの間隔（px）。位置を計算で置くのでアニメーションが繋がる。 */
 const PITCH = 24
+
+/** 段の高さ（px）。弾 1 発ぶんの背丈に合わせる。 */
+const TIER = 62
+
+/** 描く段数。1 段目が弾倉の即応弾、2 段目が補給して撃つぶん。 */
+const TIERS = 2
+
+/** 図に出す上限。これを超えたぶんは数だけ出す。 */
+const SHOWN_ROUNDS = READY_ROUNDS_PER_GUN * TIERS
 
 /** 廃莢の見せ時間（ms）。CSS 側の animation と合わせる。 */
 const EJECT_MS = 460
@@ -23,7 +29,7 @@ interface Slot {
   id: string
   code: ShellCode
   side: Side
-  /** 砲塔側から数えた位置。0 が次に撃つ 1 発。 */
+  /** その砲にとって何発目か。0 が次に撃つ 1 発。段と桁はここから決まる。 */
   index: number
   order: number
 }
@@ -33,7 +39,7 @@ function slotsOf(steps: readonly PlanStep[]): Map<string, Slot> {
   for (const side of SIDES) {
     steps
       .filter((step) => step.gun === side)
-      .slice(0, READY_ROUNDS)
+      .slice(0, SHOWN_ROUNDS)
       .forEach((step, index) => {
         slots.set(step.solution.target.id, {
           id: step.solution.target.id,
@@ -82,23 +88,35 @@ export function Loadout({ steps }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [steps])
 
-  /** 砲塔側の端を 0 として、外へ向かって置く。左右で鏡像になる。 */
-  const place = (side: Side, index: number) =>
-    side === 'left' ? { right: index * PITCH } : { left: index * PITCH }
+  /**
+   * 砲塔側の端を 0 として、外へ向かって置く。左右で鏡像になる。
+   * 弾倉に入るのは 6 発までなので、それを超えたら 1 段上に積む。
+   */
+  const place = (side: Side, index: number) => {
+    const column = (index % READY_ROUNDS_PER_GUN) * PITCH
+    const bottom = Math.floor(index / READY_ROUNDS_PER_GUN) * TIER
+    return side === 'left' ? { right: column, bottom } : { left: column, bottom }
+  }
 
   return (
     <div className="loadout">
       {SIDES.map((side) => {
         const rounds = steps.filter((step) => step.gun === side)
-        const shown = rounds.slice(0, READY_ROUNDS)
+        const shown = rounds.slice(0, SHOWN_ROUNDS)
         const overflow = rounds.length - shown.length
+        const resupply = Math.max(0, rounds.length - READY_ROUNDS_PER_GUN)
+        // 補給ぶんがあるときだけ 2 段目を開ける
+        const tiers = resupply > 0 ? TIERS : 1
 
         return (
           <div
             key={side}
             className={`mag mag--${side}`}
             // 弾架と見出しの幅を揃える。見出しだけ横に伸びると弾の並びと切れて見える。
-            style={{ ['--rack-width' as string]: `${READY_ROUNDS * PITCH}px` }}
+            style={{
+              ['--rack-width' as string]: `${READY_ROUNDS_PER_GUN * PITCH}px`,
+              ['--rack-height' as string]: `${66 + (tiers - 1) * TIER}px`,
+            }}
           >
             <div className="mag__rack">
               {shown.map((step, index) => (
@@ -108,6 +126,7 @@ export function Loadout({ steps }: Props) {
                   order={step.order}
                   next={index === 0}
                   imminent={side === nextSide}
+                  stowed={step.needsResupply}
                   style={place(side, index)}
                 />
               ))}
@@ -131,6 +150,7 @@ export function Loadout({ steps }: Props) {
               {SIDE_LABEL[side]}
               <span className="mag__count">
                 {rounds.length > 0 ? `${rounds.length} 発` : '無し'}
+                {resupply > 0 && <span className="mag__resupply">補給 {resupply}</span>}
               </span>
             </p>
           </div>

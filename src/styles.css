@@ -323,9 +323,10 @@ code {
   /* 弾は位置を計算して置く。並びが変わっても座標が繋がるので、
      廃莢と次弾の送り込みがそのまま補間される。 */
   position: relative;
-  height: 66px;
+  height: var(--rack-height, 66px);
   width: var(--rack-width);
   max-width: 100%;
+  transition: height 300ms ease;
 }
 
 .mag__label {
@@ -357,6 +358,12 @@ code {
   margin-right: auto;
 }
 
+.mag__resupply {
+  margin-left: 8px;
+  color: var(--danger);
+  letter-spacing: 0;
+}
+
 .mag__overflow {
   position: absolute;
   bottom: 18px;
@@ -382,10 +389,14 @@ code {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  /* 隣の弾が抜けたら、この補間で砲側へ送られる */
+  /* 隣の弾が抜けたら、この補間で砲側へ送られる。
+     2 段目の弾は横に送られると同時に 1 段目へ降りてくるので、
+     縦は少し遅らせて落ちる感じを出す。 */
   transition:
     right 380ms cubic-bezier(0.22, 0.68, 0.24, 1),
-    left 380ms cubic-bezier(0.22, 0.68, 0.24, 1);
+    left 380ms cubic-bezier(0.22, 0.68, 0.24, 1),
+    bottom 460ms cubic-bezier(0.34, 0.02, 0.28, 1) 60ms,
+    opacity 300ms ease;
 }
 
 .round__svg {
@@ -453,6 +464,35 @@ code {
   fill: var(--bg);
 }
 
+/* まだ砲塔に積んでいない弾。輪郭を破線にして即応弾と区別する。
+   1 段目に降りてくると破線が実線に変わり、装填されたことが分かる。 */
+.round.is-stowed {
+  opacity: 0.72;
+}
+
+.round__body,
+.round__band,
+.round__base {
+  transition:
+    fill 320ms ease,
+    stroke 320ms ease,
+    stroke-dasharray 320ms ease;
+}
+
+.round.is-stowed .round__body {
+  fill: none;
+  stroke: var(--line);
+  stroke-dasharray: 3 2.4;
+}
+
+.round.is-stowed .round__band,
+.round.is-stowed .round__base {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 3 2.4;
+}
+
 /* ---------- 廃莢 ---------- */
 
 /* 撃った弾は上へ抜けて消える。残りはこの間に砲側へ詰められる */
@@ -503,7 +543,11 @@ code {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .round {
+  .round,
+  .round__body,
+  .round__band,
+  .round__base,
+  .mag__rack {
     transition: none;
   }
 
@@ -546,9 +590,10 @@ code {
   padding: 0 6px;
 }
 
-.plan__blank {
-  /* 相方のいない行でも列がずれないように場所だけ取る */
-  min-height: 1px;
+.pair__cell {
+  /* 補給の指示とカードをまとめて 1 マスに収める。
+     グリッドの直下に複数置くと列がずれる。 */
+  min-width: 0;
 }
 
 /* ---------- 旋回量（連続射撃の律速） ---------- */
@@ -929,6 +974,89 @@ code {
   opacity: 0.5;
 }
 
+/* ---------- 補給の指示 ---------- */
+
+.resupply {
+  background: var(--panel);
+  border: 1px dashed var(--danger);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.resupply__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.resupply__mark {
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.resupply__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.resupply__note {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.resupply__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.resupply__list li {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: baseline;
+  gap: 9px;
+  background: var(--panel-2);
+  border-radius: 5px;
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.resupply__nth {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.resupply__code {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.resupply__name {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resupply__order {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
 /* ---------- 完了 ---------- */
 
 .plan__cleared {
@@ -1188,10 +1316,6 @@ code {
     border-radius: 20px;
     padding: 5px 14px;
     font-size: 12px;
-  }
-
-  .plan__blank {
-    display: none;
   }
 
   .plan__cols {

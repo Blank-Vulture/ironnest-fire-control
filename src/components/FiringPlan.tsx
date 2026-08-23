@@ -1,12 +1,14 @@
-import { SIDE_LABEL, SIDES } from '../lib/guns'
+import { READY_ROUNDS_PER_GUN, SIDE_LABEL, SIDES } from '../lib/guns'
 import {
   pairSteps,
+  resupplyQueue,
   type ChargeSetting,
   type FiringPlan as Plan,
   type GunSetting,
   type PlanStep,
 } from '../lib/targets'
 import { Loadout } from './Loadout'
+import { Resupply } from './Resupply'
 import { SolutionCard } from './SolutionCard'
 import { TurnIcon } from './TurnIcon'
 import { Turret } from './Turret'
@@ -54,20 +56,33 @@ export function FiringPlan({
   const { steps, totalTurnDeg, unplaced, done } = plan
   const rows = pairSteps(steps)
 
-  const card = (step: PlanStep | null) => {
-    if (!step) return <div className="plan__blank" aria-hidden />
-    return (
-      <SolutionCard
-        step={step}
-        onShell={(code) => onShell(step.solution.target.id, code)}
-        onCharge={(charge) => onCharge(step.solution.target.id, charge)}
-        onGun={(gun) => onGun(step.solution.target.id, gun)}
-        onImpact={(digits) => onImpact(step.solution.target.id, digits)}
-        onToggleDone={() => onToggleDone(step.solution.target.id)}
-        onRemove={() => onRemove(step.solution.target.id)}
-      />
-    )
-  }
+  /**
+   * 行の片側 1 マス。
+   *
+   * 必ず 1 つの要素で返すこと。フラグメントで複数返すと、それぞれが
+   * 別のグリッドセルに入って列が崩れる。
+   */
+  const cell = (step: PlanStep | null) => (
+    <div className="pair__cell">
+      {step && (
+        <>
+          {/* 即応弾を撃ち切る 1 発の手前に、補給の指示を挟む */}
+          {step.magIndex === READY_ROUNDS_PER_GUN && (
+            <Resupply side={step.gun} queue={resupplyQueue(steps, step.gun)} />
+          )}
+          <SolutionCard
+            step={step}
+            onShell={(code) => onShell(step.solution.target.id, code)}
+            onCharge={(charge) => onCharge(step.solution.target.id, charge)}
+            onGun={(gun) => onGun(step.solution.target.id, gun)}
+            onImpact={(digits) => onImpact(step.solution.target.id, digits)}
+            onToggleDone={() => onToggleDone(step.solution.target.id)}
+            onRemove={() => onRemove(step.solution.target.id)}
+          />
+        </>
+      )}
+    </div>
+  )
 
   if (steps.length === 0 && unplaced.length === 0 && done.length === 0) {
     return (
@@ -118,11 +133,11 @@ export function FiringPlan({
           )}
 
           <div className="pair">
-            {card(row.left)}
+            {cell(row.left)}
             <div className="pair__gutter">
               {row.midTurn !== null && <Turn deg={row.midTurn} className="turn--mid" />}
             </div>
-            {card(row.right)}
+            {cell(row.right)}
           </div>
         </div>
       ))}

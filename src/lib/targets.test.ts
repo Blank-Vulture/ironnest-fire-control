@@ -7,6 +7,7 @@ import {
   parseMeasurement,
   pairSteps,
   parseMeasurements,
+  resupplyQueue,
   solveTarget,
   type Target,
 } from './targets'
@@ -364,5 +365,65 @@ describe('撃った後の引き継ぎ', () => {
     // 200 を向いているので 210 までは 10 度
     expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(10)
     expect(plan.steps[0]!.gun).toBe('left') // 直前が右砲
+  })
+})
+
+describe('弾倉と補給', () => {
+  /** 方位を散らして n 件。交互割り当てで左右に振り分けられる。 */
+  const many = (n: number) =>
+    Array.from({ length: n }, (_, i) => at(10 + i * 2, 5))
+
+  it('その砲にとって何発目かを数える', () => {
+    const plan = buildPlan(many(6))
+    expect(plan.steps.map((s) => s.gun)).toEqual([
+      'left', 'right', 'left', 'right', 'left', 'right',
+    ])
+    expect(plan.steps.map((s) => s.magIndex)).toEqual([0, 0, 1, 1, 2, 2])
+  })
+
+  it('即応弾 6 発までは補給が要らない', () => {
+    const plan = buildPlan(many(12))
+    expect(plan.steps.every((s) => !s.needsResupply)).toBe(true)
+    expect(plan.steps.filter((s) => s.gun === 'left')).toHaveLength(6)
+    expect(plan.steps.filter((s) => s.gun === 'right')).toHaveLength(6)
+  })
+
+  it('7 発目から補給が要る', () => {
+    const plan = buildPlan(many(14))
+    const left = plan.steps.filter((s) => s.gun === 'left')
+    expect(left).toHaveLength(7)
+    expect(left.slice(0, 6).every((s) => !s.needsResupply)).toBe(true)
+    expect(left[6]!.needsResupply).toBe(true)
+    expect(left[6]!.magIndex).toBe(6)
+  })
+
+  it('補給する順に並べて返す', () => {
+    const plan = buildPlan(many(16))
+    const queue = resupplyQueue(plan.steps, 'left')
+    expect(queue).toHaveLength(2)
+    expect(queue.map((s) => s.magIndex)).toEqual([6, 7])
+    // 射撃順どおりに並ぶ
+    expect(queue[0]!.order).toBeLessThan(queue[1]!.order)
+  })
+
+  it('片方に固定すると、その砲だけ早く補給が要る', () => {
+    const targets = Array.from({ length: 8 }, (_, i) =>
+      at(10 + i * 2, 5, { gun: 'left' as const }),
+    )
+    const plan = buildPlan(targets)
+    expect(resupplyQueue(plan.steps, 'left')).toHaveLength(2)
+    expect(resupplyQueue(plan.steps, 'right')).toHaveLength(0)
+  })
+
+  it('撃ち終えたぶんは弾倉から抜けるので、補給の要否も戻る', () => {
+    const targets = Array.from({ length: 14 }, (_, i) => at(10 + i * 2, 5))
+    expect(resupplyQueue(buildPlan(targets).steps, 'left')).toHaveLength(1)
+    // 2 発撃てば残り 12 発、左右 6 発ずつに収まる
+    const after = targets.map((t, i) =>
+      i < 2
+        ? { ...t, done: true, firedAt: i + 1, firedGun: i % 2 === 0 ? ('left' as const) : ('right' as const) }
+        : t,
+    )
+    expect(resupplyQueue(buildPlan(after).steps, 'left')).toHaveLength(0)
   })
 })

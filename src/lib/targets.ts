@@ -20,7 +20,7 @@ import {
   wrapBearing,
   type Charge,
 } from './ballistics'
-import type { Side } from './guns'
+import { READY_ROUNDS_PER_GUN, type Side } from './guns'
 import { DEFAULT_SHELL, type ShellCode } from './shells'
 import { crossesMidnight, launchSod, parseTimeOfDay } from './time'
 
@@ -66,6 +66,10 @@ export interface PlanStep {
   /** 射撃順（1 始まり）。 */
   order: number
   gun: Side
+  /** その砲にとって何発目か（0 始まり）。弾倉の位置でもある。 */
+  magIndex: number
+  /** 即応弾を撃ち切った後の 1 発か。補給が要る。 */
+  needsResupply: boolean
   /** ひとつ前の目標からの旋回量（度、符号付き）。先頭は null。 */
   turnFromPrev: number | null
   /** 直前と同じ砲を使う＝装填を待つことになる。 */
@@ -279,6 +283,7 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
 
   let lastGun: Side | null = lastFired?.target.firedGun ?? null
   let totalTurnDeg = 0
+  const fireCount: Record<Side, number> = { left: 0, right: 0 }
 
   const steps: PlanStep[] = ordered.map((solution, i) => {
     const gun: Side =
@@ -300,7 +305,18 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
     const reloadStall = lastGun !== null && lastGun === gun
     lastGun = gun
 
-    return { solution, order: i + 1, gun, turnFromPrev, reloadStall }
+    const magIndex = fireCount[gun]
+    fireCount[gun] += 1
+
+    return {
+      solution,
+      order: i + 1,
+      gun,
+      magIndex,
+      needsResupply: magIndex >= READY_ROUNDS_PER_GUN,
+      turnFromPrev,
+      reloadStall,
+    }
   })
 
   return { steps, totalTurnDeg, unplaced, done }
@@ -348,4 +364,14 @@ export function pairSteps(steps: readonly PlanStep[]): PlanRow[] {
   }
 
   return rows
+}
+
+/**
+ * その砲で、即応弾を撃ち切った後に撃つぶん。補給する順に並ぶ。
+ *
+ * 弾倉に入るのは 6 発までなので、それを超える目標を抱えている砲は
+ * 途中で揚弾が要る。何を何発目に上げればよいかはこの並びがそのまま答えになる。
+ */
+export function resupplyQueue(steps: readonly PlanStep[], side: Side): PlanStep[] {
+  return steps.filter((step) => step.gun === side && step.needsResupply)
 }

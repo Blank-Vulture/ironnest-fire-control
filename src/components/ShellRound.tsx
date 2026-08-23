@@ -9,6 +9,8 @@ interface Props {
   next?: boolean
   /** その砲が全体の中でも次に撃つ側か。 */
   imminent?: boolean
+  /** 弾倉に入りきらず、補給して撃つぶんか。 */
+  stowed?: boolean
   /** 廃莢中か。抜けていく途中の描画。 */
   ejecting?: boolean
   style?: CSSProperties
@@ -25,6 +27,7 @@ export function ShellRound({
   order,
   next = false,
   imminent = false,
+  stowed = false,
   ejecting = false,
   style,
 }: Props) {
@@ -37,8 +40,8 @@ export function ShellRound({
   return (
     <div
       className={`round${next ? ' is-next' : ''}${next && imminent ? ' is-imminent' : ''}${
-        ejecting ? ' is-ejecting' : ''
-      }`}
+        stowed ? ' is-stowed' : ''
+      }${ejecting ? ' is-ejecting' : ''}`}
       style={style}
       title={`${code} — ${shellByCode(code).jp}`}
       aria-hidden={ejecting}
