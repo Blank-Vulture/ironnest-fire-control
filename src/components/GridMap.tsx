@@ -12,6 +12,9 @@ import type { SurveyDoc, SurveyResult } from '../lib/survey'
 interface Props {
   doc: SurveyDoc
   survey: SurveyResult
+  /** 外から指している点（既知点の一覧にホバーしたときなど）。 */
+  highlight: string | null
+  onHighlight: (id: string | null) => void
 }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRST'
@@ -75,7 +78,7 @@ interface Marker {
  * 拡大しても点や字が膨らまないよう、印と文字の大きさは倍率から逆算して
  * 画面上で一定に保つ。線は vector-effect で太さを固定する。
  */
-export function GridMap({ doc, survey }: Props) {
+export function GridMap({ doc, survey, highlight, onHighlight }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<ViewBox>(FULL_VIEW)
   const [width, setWidth] = useState(900)
@@ -113,8 +116,8 @@ export function GridMap({ doc, survey }: Props) {
 
   /* ---------- 描くもの ---------- */
 
-  const rays: { id: string; from: Point; to: Point; color: string }[] = []
-  const circles: { id: string; at: Point; radius: number; color: string }[] = []
+  const rays: { id: string; fromId: string; from: Point; to: Point; color: string }[] = []
+  const circles: { id: string; fromId: string; at: Point; radius: number; color: string }[] = []
 
   for (const fix of doc.fixes) {
     for (const sight of fix.sightings) {
@@ -124,10 +127,18 @@ export function GridMap({ doc, survey }: Props) {
 
       const bearingDeg = parseBearing(sight.bearingInput)
       if (bearingDeg !== null) {
-        rays.push({ id: sight.id, from, to: pointFrom(from, bearingDeg, RAY_KM), color })
+        rays.push({
+          id: sight.id,
+          fromId: sight.fromId,
+          from,
+          to: pointFrom(from, bearingDeg, RAY_KM),
+          color,
+        })
       }
       const rangeKm = parseDistance(sight.rangeInput)
-      if (rangeKm !== null) circles.push({ id: sight.id, at: from, radius: rangeKm, color })
+      if (rangeKm !== null) {
+        circles.push({ id: sight.id, fromId: sight.fromId, at: from, radius: rangeKm, color })
+      }
     }
   }
 
@@ -165,6 +176,14 @@ export function GridMap({ doc, survey }: Props) {
   }
 
   const shown = markers.find((m) => m.id === picked) ?? hovered
+
+  /**
+   * いま注目している点。色相は種類（味方・敵・自機）に使い切っているので、
+   * 「誰の報告か」はここで濃淡を切り替えて示す。
+   * 1 人ぶんだけを浮き上がらせる方が、全部を色で塗り分けるより追いやすい。
+   */
+  const focused = picked ?? hovered?.id ?? highlight
+  const dimmed = (id: string) => focused !== null && focused !== id
 
   /* ---------- 拡大・パン ---------- */
 
@@ -273,7 +292,10 @@ export function GridMap({ doc, survey }: Props) {
         onPointerCancel={onPointerUp}
         onClick={(event) => {
           // 印以外を押したら選択を外す
-          if ((event.target as Element).closest('.pin') === null) setPicked(null)
+          if ((event.target as Element).closest('.pin') === null) {
+            setPicked(null)
+            onHighlight(null)
+          }
         }}
       >
         <defs>
@@ -320,7 +342,7 @@ export function GridMap({ doc, survey }: Props) {
           {circles.map((circle) => (
             <circle
               key={circle.id}
-              className="map__range"
+              className={`map__range${dimmed(circle.fromId) ? ' is-dim' : ''}`}
               cx={circle.at.x}
               cy={sy(circle.at.y)}
               r={circle.radius}
@@ -330,7 +352,7 @@ export function GridMap({ doc, survey }: Props) {
           {rays.map((ray) => (
             <line
               key={ray.id}
-              className="map__bearing"
+              className={`map__bearing${dimmed(ray.fromId) ? ' is-dim' : ''}`}
               x1={ray.from.x}
               y1={sy(ray.from.y)}
               x2={ray.to.x}
@@ -346,6 +368,7 @@ export function GridMap({ doc, survey }: Props) {
             marker={marker}
             px={px}
             active={shown?.id === marker.id}
+            dim={dimmed(marker.id)}
             onEnter={() => setHovered(marker)}
             onLeave={() => setHovered((h) => (h?.id === marker.id ? null : h))}
             onPick={() => setPicked((p) => (p === marker.id ? null : marker.id))}
@@ -376,19 +399,20 @@ interface PinProps {
   marker: Marker
   px: (n: number) => number
   active: boolean
+  dim: boolean
   onEnter: () => void
   onLeave: () => void
   onPick: () => void
 }
 
-function Pin({ marker, px, active, onEnter, onLeave, onPick }: PinProps) {
+function Pin({ marker, px, active, dim, onEnter, onLeave, onPick }: PinProps) {
   const { at, kind, name } = marker
   const cx = at.x
   const cy = sy(at.y)
 
   return (
     <g
-      className={`pin pin--${kind}${active ? ' is-active' : ''}`}
+      className={`pin pin--${kind}${active ? ' is-active' : ''}${dim ? ' is-dim' : ''}`}
       style={{ color: marker.color }}
       onPointerEnter={onEnter}
       onPointerLeave={onLeave}

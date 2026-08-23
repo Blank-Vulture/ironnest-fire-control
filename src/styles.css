@@ -252,6 +252,7 @@ code {
   stroke-dasharray: 6 4;
   vector-effect: non-scaling-stroke;
   opacity: 0.85;
+  transition: opacity 140ms ease;
 }
 
 /* 方位の報告 */
@@ -259,6 +260,23 @@ code {
   stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
   opacity: 0.85;
+  transition: opacity 140ms ease;
+}
+
+/* どこかの点に注目している間、他の報告は沈める。
+   色相は種類（味方・敵・自機）に使い切っているので、
+   「誰の報告か」はこの濃淡で示す。 */
+.map__range.is-dim,
+.map__bearing.is-dim {
+  opacity: 0.13;
+}
+
+.pin.is-dim {
+  opacity: 0.3;
+}
+
+.pin {
+  transition: opacity 140ms ease;
 }
 
 /* ---------- 地図上の印 ---------- */
@@ -422,7 +440,7 @@ code {
 
 .known__row {
   display: grid;
-  grid-template-columns: 18px minmax(80px, 1fr) 9em 28px;
+  grid-template-columns: 18px minmax(80px, 1fr) 9em auto 28px;
   gap: 8px;
   align-items: center;
   background: var(--panel);
@@ -433,6 +451,28 @@ code {
 
 .known__row.is-nest {
   border-color: var(--accent-dim);
+}
+
+/* 補給隊は IRON NEST にぶら下げて見せる */
+.known__row.is-child {
+  margin-left: 22px;
+  border-style: dashed;
+}
+
+.known__update {
+  background: none;
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  color: var(--accent);
+  padding: 5px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.known__update:hover {
+  background: var(--panel-2);
+  border-color: var(--accent);
 }
 
 .known__mark {
@@ -2054,8 +2094,18 @@ code {
     grid-template-columns: 18px 1fr 28px;
     grid-template-areas:
       'mark label remove'
-      '.    grid  grid';
+      '.    grid  grid'
+      '.    update update';
     row-gap: 5px;
+  }
+
+  .known__update {
+    grid-area: update;
+    justify-self: start;
+  }
+
+  .known__row.is-child {
+    margin-left: 12px;
   }
 
   .known__mark {

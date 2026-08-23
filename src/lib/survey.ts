@@ -27,6 +27,8 @@ export interface KnownPoint {
   gridInput: string
   /** 砲座。射撃諸元の基準になるので 1 つだけ。 */
   isNest: boolean
+  /** 別の点にぶら下げて見せるとき、その親。補給隊を IRON NEST の下に置く。 */
+  parentId?: PointId
 }
 
 /** ある点から見た報告。方位だけ・距離だけ・両方のどれでもよい。 */

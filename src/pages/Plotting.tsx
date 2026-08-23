@@ -2,7 +2,16 @@ import { useMemo, useState } from 'react'
 import { FixCard } from '../components/FixCard'
 import { GridMap } from '../components/GridMap'
 import { formatPoint } from '../lib/grid'
-import { isNestLabel, parseGrid, parseRoster } from '../lib/grid'
+import {
+  MAP_HEIGHT_KM,
+  MAP_WIDTH_KM,
+  formatGrid,
+  gridToPoint,
+  isNestLabel,
+  parseGrid,
+  parseRoster,
+} from '../lib/grid'
+import { planConvoyRequest } from '../lib/convoy'
 import {
   availableSources,
   solveSurvey,
@@ -57,8 +66,12 @@ export function emptySurveyDoc(): SurveyDoc {
  * 「距離が重なる地点をまず出し、そこからの方位で目標を出す」という
  * 段を重ねた任務がそのまま組める。
  */
+/** 自機の現在地を割り出すための標定。押し直しても増えないよう id を固定する。 */
+const NEST_FIX_ID = 'nest-position'
+
 export function Plotting({ doc, onChange, onAddTarget }: Props) {
   const [pasteError, setPasteError] = useState<string[]>([])
+  const [highlight, setHighlight] = useState<string | null>(null)
 
   const survey = useMemo(() => solveSurvey(doc), [doc])
 
@@ -110,9 +123,68 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
     })
   }
 
+  /**
+   * 補給隊への位置報告要請を組み立てる。
+   *
+   * 緊急移動は発動地点のまわりに散るだけなので、移動前の座標が手がかりになる。
+   * そこから 2 隊の視線が直角に近く交わるタイルを選んで要請先にしておく。
+   * あとは戻ってきた報告（サブ座標か方位）を入れるだけで自機の位置が出る。
+   */
+  const requestConvoys = () => {
+    const nest = doc.known.find((k) => k.isNest)
+    if (nest === undefined) return
+
+    const ref = parseGrid(nest.gridInput)
+    const lastKnown = ref !== null
+      ? gridToPoint(ref)
+      : { x: MAP_WIDTH_KM / 2, y: MAP_HEIGHT_KM / 2 }
+    const plan = planConvoyRequest(lastKnown)
+    if (plan === null) return
+
+    const existing = doc.known.filter((k) => k.parentId === nest.id)
+    const convoys = plan.tiles.map((tile, i) => ({
+      id: existing[i]?.id ?? id('k'),
+      label: existing[i]?.label ?? `補給隊 ${i + 1}`,
+      gridInput: formatGrid(tile),
+      isNest: false,
+      parentId: nest.id,
+    }))
+
+    const previous = doc.fixes.find((f) => f.id === NEST_FIX_ID)
+    const nestFix: Fix = {
+      id: NEST_FIX_ID,
+      label: previous?.label ?? 'IRON NEST 現在地',
+      // 要請を出し直したら報告も取り直しになるので、値は空にしておく
+      sightings: convoys.map((convoy, i) => ({
+        id: previous?.sightings[i]?.id ?? id('s'),
+        fromId: convoy.id,
+        bearingInput: '',
+        rangeInput: '',
+      })),
+    }
+
+    onChange({
+      known: [
+        ...doc.known.filter((k) => k.parentId !== nest.id),
+        ...convoys,
+      ],
+      fixes: [nestFix, ...doc.fixes.filter((f) => f.id !== NEST_FIX_ID)],
+    })
+  }
+
+  // 親のすぐ下に子を並べる。補給隊が IRON NEST にぶら下がって見えるように。
+  const orderedKnown = doc.known
+    .filter((k) => k.parentId === undefined)
+    .flatMap((point) => [point, ...doc.known.filter((k) => k.parentId === point.id)])
+
   return (
     <>
-      <GridMap doc={doc} survey={survey} />
+      <GridMap
+        doc={doc}
+        survey={survey}
+        highlight={highlight}
+        onHighlight={setHighlight}
+      />
 
       <section className="known">
         <div className="known__head">
@@ -123,10 +195,17 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
         </div>
 
         <ol className="known__list">
-          {doc.known.map((point) => {
+          {orderedKnown.map((point) => {
             const bad = point.gridInput !== '' && parseGrid(point.gridInput) === null
             return (
-              <li key={point.id} className={`known__row${point.isNest ? ' is-nest' : ''}`}>
+              <li
+                key={point.id}
+                className={`known__row${point.isNest ? ' is-nest' : ''}${
+                  point.parentId !== undefined ? ' is-child' : ''
+                }`}
+                onMouseEnter={() => setHighlight(point.id)}
+                onMouseLeave={() => setHighlight((h) => (h === point.id ? null : h))}
+              >
                 <span className="known__mark" aria-hidden>
                   {point.isNest ? '◉' : '○'}
                 </span>
@@ -148,13 +227,28 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
                   aria-label="グリッド座標"
                   aria-invalid={bad}
                 />
+                {point.isNest && (
+                  <button
+                    className="known__update"
+                    onClick={requestConvoys}
+                    title="緊急移動のあと。移動前の座標を手がかりに、補給隊へ位置報告を要請する先を決めます"
+                  >
+                    座標を更新
+                  </button>
+                )}
+
                 <button
                   className="known__remove"
                   onClick={() =>
-                    onChange({ ...doc, known: doc.known.filter((k) => k.id !== point.id) })
+                    onChange({
+                      ...doc,
+                      known: doc.known.filter(
+                        (k) => k.id !== point.id && k.parentId !== point.id,
+                      ),
+                    })
                   }
                   disabled={point.isNest}
-                  title={point.isNest ? '砲座は消せません' : '削除'}
+                  title={point.isNest ? 'IRON NEST は消せません' : '削除'}
                   aria-label={`${point.label} を削除`}
                 >
                   ✕
