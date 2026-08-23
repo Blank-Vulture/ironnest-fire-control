@@ -15,6 +15,8 @@ interface Props {
   onRemoveSighting: (sightingId: string) => void
   onRemove: () => void
   onAddTarget: (measurement: Measurement) => void
+  /** この点を IRON NEST の現在地として採用する。 */
+  onAdoptAsNest: () => void
 }
 
 /** m 単位に丸めて出す。km で出すと桁が読みづらい。 */
@@ -30,10 +32,15 @@ export function FixCard({
   onRemoveSighting,
   onRemove,
   onAddTarget,
+  onAdoptAsNest,
 }: Props) {
   const { fix, status } = resolved
   const position = status.kind === 'solved' ? status.position : null
   const solution = position !== null && nest !== null ? firingSolutionFrom(nest, position) : null
+  const altSolution =
+    resolved.alternative !== null && nest !== null
+      ? firingSolutionFrom(nest, resolved.alternative)
+      : null
   const shallow =
     resolved.crossingAngleDeg !== null && resolved.crossingAngleDeg < SHALLOW_CROSSING_DEG
 
@@ -121,20 +128,64 @@ export function FixCard({
 
       <FixStatusLine resolved={resolved} shallow={shallow} />
 
-      {solution !== null && (
-        <footer className="fix__solution">
-          <span className="fix__k">砲座から</span>
-          <strong>
-            {solution.bearingDeg.toFixed(1)}° / {solution.distanceKm.toFixed(2)} km
+      {resolved.alternative !== null && (
+        <div className="fix__alt">
+          <span className="fix__k">もう一方</span>
+          <strong className="fix__altgrid">
+            {formatPoint(resolved.alternative) ?? 'マップ外'}
           </strong>
+          {altSolution !== null && (
+            <>
+              <span className="fix__altsolution">
+                {altSolution.bearingDeg.toFixed(1)}° / {altSolution.distanceKm.toFixed(2)} km
+              </span>
+              <button
+                className="fix__try"
+                title="こちらへ 1 発撃って、当たるかどうかで候補を絞る"
+                onClick={() =>
+                  onAddTarget({
+                    bearingDeg: altSolution.bearingDeg,
+                    distanceKm: altSolution.distanceKm,
+                  })
+                }
+              >
+                撃って確かめる
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {position !== null && (
+        <footer className="fix__solution">
+          {solution !== null ? (
+            <>
+              <span className="fix__k">IRON NEST から</span>
+              <strong>
+                {solution.bearingDeg.toFixed(1)}° / {solution.distanceKm.toFixed(2)} km
+              </strong>
+            </>
+          ) : (
+            <span className="fix__k">IRON NEST の位置を入れると射撃諸元が出ます</span>
+          )}
+
           <button
-            className="fix__use"
-            onClick={() =>
-              onAddTarget({ bearingDeg: solution.bearingDeg, distanceKm: solution.distanceKm })
-            }
+            className="fix__adopt"
+            onClick={onAdoptAsNest}
+            title="緊急移動のあとなど、この点を自機の現在地として採用する"
           >
-            射撃順に追加
+            現在地にする
           </button>
+          {solution !== null && (
+            <button
+              className="fix__use"
+              onClick={() =>
+                onAddTarget({ bearingDeg: solution.bearingDeg, distanceKm: solution.distanceKm })
+              }
+            >
+              射撃順に追加
+            </button>
+          )}
         </footer>
       )}
     </article>
@@ -193,8 +244,8 @@ function FixStatusLine({ resolved, shallow }: { resolved: ResolvedFix; shallow: 
 
       {resolved.alternative !== null && (
         <p className="fix__status is-warn">
-          候補が 2 つあります（もう一方は {formatPoint(resolved.alternative) ?? 'マップ外'}）。
-          観測をもう 1 つ足すか、地形で絞ってください
+          候補が 2 つあります。観測をもう 1 つ足すか、地形で絞るか、
+          片方へ 1 発撃って当たりで確かめてください
         </p>
       )}
     </div>

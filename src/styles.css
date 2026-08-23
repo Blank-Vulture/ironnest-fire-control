@@ -201,6 +201,112 @@ code {
   color: var(--danger);
 }
 
+/* ---------- 戦術地図 ---------- */
+
+.map {
+  width: 100%;
+  height: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  /* viewBox の 1 単位が 1km。線の太さは倍率に引きずられないよう固定する */
+  overflow: visible;
+}
+
+.map__field {
+  fill: #0f1319;
+}
+
+.map__grid line {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.map__labels text {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.34px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+/* 距離の報告 */
+.map__range {
+  fill: none;
+  stroke-width: 1.4;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.85;
+}
+
+/* 方位の報告 */
+.map__bearing {
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.85;
+}
+
+.map__spot circle {
+  fill: currentColor;
+}
+
+.map__spot text {
+  fill: currentColor;
+  font-size: 0.3px;
+  font-family: var(--sans);
+  text-anchor: middle;
+}
+
+.map__nest circle {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.map__nest path {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.map__nest text {
+  fill: var(--accent);
+  font-size: 0.34px;
+  font-family: var(--mono);
+  letter-spacing: 0.02px;
+  text-anchor: middle;
+}
+
+.map__fix path {
+  stroke: var(--text);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.map__fix text {
+  fill: var(--text);
+  font-size: 0.32px;
+  font-family: var(--sans);
+  text-anchor: middle;
+}
+
+.map__alt circle {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.map__alt text {
+  fill: var(--muted);
+  font-size: 0.28px;
+  font-family: var(--sans);
+  text-anchor: middle;
+}
+
 /* ---------- 既知点 ---------- */
 
 .known,
@@ -523,7 +629,119 @@ code {
   background: #f0b64a;
 }
 
+/* もう一方の候補。撃って確かめるための行 */
+.fix__alt {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+
+.fix__altgrid {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.fix__altsolution {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fix__try {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  color: var(--accent);
+  padding: 4px 11px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fix__try:hover {
+  border-color: var(--accent);
+  background: var(--panel-2);
+}
+
+.fix__adopt {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  padding: 5px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fix__adopt:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ---------- 目標の取り込み ---------- */
+/* もう一方の候補。撃って確かめるための行 */
+.fix__alt {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+
+.fix__altgrid {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.fix__altsolution {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fix__try {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  color: var(--accent);
+  padding: 4px 11px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fix__try:hover {
+  border-color: var(--accent);
+  background: var(--panel-2);
+}
+
+.fix__adopt {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  padding: 5px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fix__adopt:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ---------- 目標の取り込み ---------- */
 
 .intake {
@@ -1752,7 +1970,8 @@ code {
     grid-area: remove;
   }
 
-  .fix__use {
+  .fix__use,
+  .fix__try {
     margin-left: 0;
   }
 

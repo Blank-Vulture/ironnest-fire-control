@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FixCard } from '../components/FixCard'
+import { GridMap } from '../components/GridMap'
+import { formatPoint } from '../lib/grid'
 import { isNestLabel, parseGrid, parseRoster } from '../lib/grid'
 import {
   availableSources,
@@ -32,12 +34,16 @@ export function newFix(index: number): Fix {
   return { id: id('f'), label: `目標 ${index}`, sightings: [newSighting(), newSighting()] }
 }
 
+export const NEST_LABEL = 'IRON NEST'
+
 export function emptySurveyDoc(): SurveyDoc {
   return {
     known: [
-      { id: id('k'), label: '砲座', gridInput: '', isNest: true },
+      { id: id('k'), label: NEST_LABEL, gridInput: '', isNest: true },
+      // 観測員は基本 3 人つく
       newKnownPoint(1),
       newKnownPoint(2),
+      newKnownPoint(3),
     ],
     fixes: [newFix(1)],
   }
@@ -77,7 +83,7 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
       known: [
         {
           id: nest?.id ?? id('k'),
-          label: nest?.label ?? '砲座',
+          label: nest?.label ?? NEST_LABEL,
           gridInput: nestEntry ? formatEntryGrid(nestEntry.grid) : (nest?.gridInput ?? ''),
           isNest: true,
         },
@@ -92,8 +98,22 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
     setPasteError(bad)
   }
 
+  /** 標定できた点を IRON NEST の現在地として書き込む。緊急移動のあとに使う。 */
+  const adoptAsNest = (fixId: string) => {
+    const resolved = survey.fixes.find((f) => f.fix.id === fixId)
+    if (resolved?.status.kind !== 'solved') return
+    const grid = formatPoint(resolved.status.position)
+    if (grid === null) return
+    onChange({
+      ...doc,
+      known: doc.known.map((k) => (k.isNest ? { ...k, gridInput: grid } : k)),
+    })
+  }
+
   return (
     <>
+      <GridMap doc={doc} survey={survey} />
+
       <section className="known">
         <div className="known__head">
           <h2 className="section__title">既知点</h2>
@@ -197,6 +217,7 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
                 onChange({ ...doc, fixes: doc.fixes.filter((f) => f.id !== resolved.fix.id) })
               }
               onAddTarget={onAddTarget}
+              onAdoptAsNest={() => adoptAsNest(resolved.fix.id)}
             />
           ))}
         </div>
@@ -221,6 +242,11 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
         <p>
           <strong>推定した点を観測元にすると、その誤差はそのまま持ち越されます。</strong>
           段を重ねるほど最終的な誤差は大きくなるので、累積ぶんの表示を見ながら組んでください。
+        </p>
+        <p>
+          緊急移動で自機の位置が分からなくなったら、補給隊の位置報告を観測にして
+          <strong>IRON NEST 自身を標定</strong>し、<strong>現在地にする</strong>を押してください。
+          砲座の座標が書き換わり、以降の射撃諸元がその位置で計算されます。
         </p>
       </footer>
     </>
