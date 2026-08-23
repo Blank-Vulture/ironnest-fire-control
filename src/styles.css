@@ -107,87 +107,118 @@ code {
   letter-spacing: 0.02em;
 }
 
-/* ---------- 目標の推定（三角測量） ---------- */
+/* ---------- 画面の切り替え ---------- */
 
-.survey {
-  border: 1px solid var(--line);
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.tabs__tab {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  background: none;
+  border: 1px solid transparent;
   border-radius: var(--radius);
+  padding: 7px 15px;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.tabs__tab:hover {
+  color: var(--text);
+  border-color: var(--line);
+}
+
+.tabs__tab.is-on {
+  color: var(--accent);
+  border-color: var(--accent-dim);
   background: var(--panel);
 }
 
-.survey.is-open {
-  border-color: var(--accent-dim);
+.tabs__jp {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
 }
 
-.survey__toggle {
-  width: 100%;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  background: none;
-  border: none;
-  padding: 11px 16px;
-  cursor: pointer;
-  text-align: left;
+.tabs__count {
+  font-size: 10px;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+/* ---------- 節の見出し ---------- */
+
+.section__title {
+  margin: 0;
   font-size: 12px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--accent);
 }
 
-.survey__caret {
-  font-size: 10px;
-}
-
-.survey__summary {
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0;
+.section__hint {
+  font-size: 11px;
   color: var(--muted);
-  text-align: right;
 }
 
-.survey__body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 0 16px 14px;
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
+.section__add {
+  align-self: flex-start;
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  padding: 7px 15px;
+  cursor: pointer;
+  font-size: 12px;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
-.survey__hint {
+.section__add:hover {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.section__error {
   margin: 0;
   font-size: 11px;
-  line-height: 1.7;
-  color: var(--muted);
+  color: var(--danger);
 }
 
-.survey__k {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-  white-space: nowrap;
-}
+/* ---------- 既知点 ---------- */
 
-.survey__nest {
+.known,
+.fixes {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 9px;
 }
 
-.survey__nest input {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 7px 10px;
-  font-family: var(--mono);
-  font-size: 15px;
-  width: 8em;
-  outline: none;
+.known__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.survey__list {
+.known__list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -196,22 +227,35 @@ code {
   gap: 5px;
 }
 
-.spotter {
+.known__row {
   display: grid;
-  grid-template-columns: minmax(72px, 1fr) 7em 5.5em 5.5em 28px;
-  gap: 7px;
+  grid-template-columns: 18px minmax(80px, 1fr) 9em 28px;
+  gap: 8px;
   align-items: center;
-}
-
-.spotter--header {
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.spotter input {
-  background: var(--panel-2);
+  background: var(--panel);
   border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+}
+
+.known__row.is-nest {
+  border-color: var(--accent-dim);
+}
+
+.known__mark {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.known__row.is-nest .known__mark {
+  color: var(--accent);
+}
+
+.known__label,
+.known__grid {
+  background: var(--panel-2);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 6px 9px;
   min-width: 0;
@@ -219,30 +263,26 @@ code {
   transition: border-color 120ms ease;
 }
 
-.spotter__grid,
-.spotter__num {
+.known__grid {
   font-family: var(--mono);
+  font-size: 15px;
 }
 
-.spotter__num {
-  text-align: right;
-}
-
-.spotter input:focus {
+.known__label:focus,
+.known__grid:focus {
   border-color: var(--accent);
 }
 
-.spotter input.is-invalid,
-.survey__nest input.is-invalid {
+.known__grid.is-invalid {
   border-color: var(--danger);
   color: var(--danger);
 }
 
-.spotter input::placeholder {
+.known__grid::placeholder {
   color: #4a5361;
 }
 
-.spotter__remove {
+.known__remove {
   background: none;
   border: none;
   color: var(--muted);
@@ -251,112 +291,239 @@ code {
   border-radius: 4px;
 }
 
-.spotter__remove:hover:not(:disabled) {
+.known__remove:hover:not(:disabled) {
   color: var(--danger);
   background: var(--panel-2);
 }
 
-.spotter__remove:disabled {
-  opacity: 0.25;
+.known__remove:disabled {
+  opacity: 0.22;
   cursor: default;
 }
 
-.survey__add {
-  align-self: flex-start;
-  background: none;
-  border: 1px dashed var(--line);
+/* ---------- 標定点 ---------- */
+
+.fixes__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 10px;
+}
+
+.fix {
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.fix.is-solved {
+  border-color: var(--accent-dim);
+}
+
+.fix__head {
+  display: grid;
+  grid-template-columns: minmax(60px, 1fr) auto 26px;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.fix__label {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 4px 7px;
+  font-size: 13px;
+  min-width: 0;
+  outline: none;
+}
+
+.fix__label:focus {
+  border-color: var(--accent-dim);
+  background: var(--panel-2);
+}
+
+.fix__position {
+  font-family: var(--mono);
+  font-size: clamp(17px, 2.6vw, 21px);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.fix__remove {
+  background: none;
+  border: none;
   color: var(--muted);
-  padding: 6px 14px;
   cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.fix__remove:hover {
+  color: var(--danger);
+  background: var(--panel-2);
+}
+
+.fix__sightings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sight {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) 4.6em 4.6em 24px;
+  gap: 6px;
+  align-items: center;
+}
+
+.sight--header {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.sight--header span:nth-child(2),
+.sight--header span:nth-child(3) {
+  text-align: right;
+}
+
+.sight__from,
+.sight__num {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 5px 7px;
+  min-width: 0;
+  outline: none;
   font-size: 12px;
 }
 
-.survey__add:hover {
+.sight__from {
+  cursor: pointer;
+}
+
+.sight__num {
+  font-family: var(--mono);
+  text-align: right;
+}
+
+.sight__from:focus,
+.sight__num:focus {
+  border-color: var(--accent);
+}
+
+.sight__num::placeholder {
+  color: #4a5361;
+}
+
+.sight__remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.sight__remove:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.sight__remove:disabled {
+  opacity: 0.22;
+  cursor: default;
+}
+
+.fix__add {
+  align-self: flex-start;
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.fix__add:hover {
   border-color: var(--accent-dim);
   color: var(--accent);
 }
 
-.survey__result {
+.fix__quality {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  border-top: 1px solid var(--line);
-  padding-top: 11px;
+  gap: 5px;
 }
 
-.survey__found {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-}
-
-.survey__grid {
+.fix__numbers {
+  margin: 0;
   font-family: var(--mono);
-  font-size: clamp(19px, 3.4vw, 25px);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fix__status {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.fix__status.is-warn {
   color: var(--accent);
-  letter-spacing: 0.02em;
 }
 
-.survey__solution {
+.fix__status.is-bad {
+  color: var(--danger);
+}
+
+.fix__k {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.fix__solution {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 9px;
+}
+
+.fix__solution strong {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 15px;
 }
 
-.survey__use {
+.fix__use {
   margin-left: auto;
   background: var(--accent);
   border: 1px solid var(--accent);
   border-radius: 6px;
   color: var(--bg);
-  padding: 6px 15px;
+  padding: 5px 14px;
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.survey__use:hover {
+.fix__use:hover {
   background: #f0b64a;
 }
 
-.survey__quality {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.survey__status {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.7;
-  color: var(--muted);
-}
-
-.survey__status.is-warn {
-  color: var(--accent);
-}
-
-.survey__status.is-bad {
-  color: var(--danger);
-}
-
-.survey__error {
-  margin: 0;
-  font-size: 11px;
-  color: var(--danger);
-}
-
-.survey__ambiguous {
-  border: 1px dashed var(--accent-dim);
-  border-radius: 6px;
-  padding: 9px 11px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
+/* ---------- 目標の取り込み ---------- */
 /* ---------- 目標の取り込み ---------- */
 
 .intake {
@@ -1534,53 +1701,63 @@ code {
 /* ---------- 画面が狭いとき ---------- */
 
 @media (max-width: 620px) {
-  /* 観測員の欄は横に 4 つ並ばないので、名前 / 位置 / 方位・距離 の 3 段に折る */
-  .spotter {
-    grid-template-columns: 1fr 1fr 28px;
+  /* 観測の欄は横に 3 つ並ばないので、観測元を上の段に出す */
+  .sight {
+    grid-template-columns: 1fr 1fr 24px;
     grid-template-areas:
-      'label label remove'
-      'grid  grid  grid'
-      'bear  range range';
+      'from from remove'
+      'bear range .';
     gap: 5px;
   }
 
-  .spotter--header {
+  .sight--header {
     display: none;
   }
 
-  .spotter__label {
-    grid-area: label;
+  .sight__from {
+    grid-area: from;
   }
 
-  .spotter__grid {
-    grid-area: grid;
-  }
-
-  .spotter__num:nth-of-type(3) {
+  .sight__num:nth-of-type(1) {
     grid-area: bear;
   }
 
-  .spotter__num:nth-of-type(4) {
+  .sight__num:nth-of-type(2) {
     grid-area: range;
   }
 
-  .spotter__remove {
+  .sight__remove {
     grid-area: remove;
     justify-self: end;
   }
 
-  .survey__use {
+  .known__row {
+    grid-template-columns: 18px 1fr 28px;
+    grid-template-areas:
+      'mark label remove'
+      '.    grid  grid';
+    row-gap: 5px;
+  }
+
+  .known__mark {
+    grid-area: mark;
+  }
+  .known__label {
+    grid-area: label;
+  }
+  .known__grid {
+    grid-area: grid;
+  }
+  .known__remove {
+    grid-area: remove;
+  }
+
+  .fix__use {
     margin-left: 0;
   }
 
-  .survey__toggle {
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .survey__summary {
-    margin-left: 0;
-    text-align: left;
+  .tabs__jp {
+    display: none;
   }
 
   /* 砲塔の脇に弾を並べる幅が無いので、図の下に左右で並べる */
