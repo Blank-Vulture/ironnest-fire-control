@@ -379,6 +379,23 @@ code {
   line-height: 1;
 }
 
+.turnicon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+/* 溝の中では文字が縦に細るぶん、アイコンを大きめに取って向きを読ませる */
+.turn--mid .turnicon {
+  width: 24px;
+  height: 24px;
+}
+
+/* 左回りは右回りの鏡像。左右で形が食い違わないよう反転だけで作る */
+.turnicon.is-ccw {
+  transform: scaleX(-1);
+}
+
 .stall {
   width: fit-content;
   margin: 0 auto 8px;

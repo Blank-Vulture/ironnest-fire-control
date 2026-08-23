@@ -7,6 +7,7 @@ import {
   type PlanStep,
 } from '../lib/targets'
 import { SolutionCard } from './SolutionCard'
+import { TurnIcon } from './TurnIcon'
 import { Turret } from './Turret'
 
 interface Props {
@@ -27,9 +28,7 @@ function Turn({ deg, className }: { deg: number; className: string }) {
       className={`turn ${className}${none ? ' is-none' : ''}`}
       title="砲塔の旋回量。左右の砲で共通なので、ここが連続射撃の律速になる"
     >
-      <span className="turn__icon" aria-hidden>
-        {none ? '·' : deg >= 0 ? '↻' : '↺'}
-      </span>
+      {none ? <span className="turn__icon" aria-hidden>·</span> : <TurnIcon deg={deg} />}
       {none ? '旋回不要' : `${Math.abs(deg).toFixed(1)}° ${deg >= 0 ? '右' : '左'}`}
     </p>
   )

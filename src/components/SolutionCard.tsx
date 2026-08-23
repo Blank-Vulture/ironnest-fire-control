@@ -159,7 +159,10 @@ export function SolutionCard({
           />
         </label>
 
-        <label className="card__field card__field--override">
+        <label
+          className="card__field card__field--override"
+          title="計算した飛翔時間の代わりに、ここに入れた値で発射時刻を出します。ゲーム内の表示と食い違ったときの逃げ道です"
+        >
           <span className="card__k">飛翔上書き</span>
           <input
             value={target.flightOverride}

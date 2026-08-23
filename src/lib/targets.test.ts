@@ -245,3 +245,29 @@ describe('行への組み分け', () => {
     expect(pairSteps([])).toEqual([])
   })
 })
+
+describe('旋回の向き', () => {
+  it('いちばん広い隙間を通らないので、旋回は常に右回りになる', () => {
+    // 円周上のどこに散らばらせても、180 度を超える隙間は最大の 1 つしか
+    // 存在しえない。その隙間を跨がない順路なので、逆回りは発生しない。
+    const cases = [
+      [10, 20, 30],
+      [350, 10, 30],
+      [0, 90, 180, 270],
+      [5, 185, 200],
+      [359.9, 0.1],
+      [100, 279, 280],
+    ]
+    for (const bearings of cases) {
+      const plan = buildPlan(bearings.map((b) => at(b, 5)))
+      for (const step of plan.steps) {
+        if (step.turnFromPrev !== null) expect(step.turnFromPrev).toBeGreaterThanOrEqual(0)
+      }
+    }
+  })
+
+  it('総旋回は「一周 − 最大の隙間」になる', () => {
+    const plan = buildPlan([0, 90, 180, 270].map((b) => at(b, 5)))
+    expect(plan.totalTurnDeg).toBeCloseTo(270) // 隙間はすべて 90 度
+  })
+})
