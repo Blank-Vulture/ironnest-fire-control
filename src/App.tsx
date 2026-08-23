@@ -26,9 +26,8 @@ function load(): Target[] {
         Number.isFinite(t?.bearingDeg) &&
         Number.isFinite(t?.distanceKm) &&
         typeof t?.shell === 'string' &&
-        typeof t?.impactDigits === 'string' &&
-        typeof t?.flightOverride === 'string',
-    )
+        typeof t?.impactDigits === 'string',
+    ).map((t) => ({ ...t, done: t.done === true }))
   } catch {
     return []
   }
@@ -84,7 +83,19 @@ export function App() {
         onCharge={(id, charge: ChargeSetting) => patch(id, { charge })}
         onGun={(id, gun: GunSetting) => patch(id, { gun })}
         onImpact={(id, impactDigits) => patch(id, { impactDigits })}
-        onFlightOverride={(id, flightOverride) => patch(id, { flightOverride })}
+        onToggleDone={(id) => {
+          // 撃った時点の砲と時刻を残す。次の割り当てをその続きから振るため。
+          const gun = plan.steps.find((step) => step.solution.target.id === id)?.gun
+          setTargets((prev) =>
+            prev.map((t) =>
+              t.id !== id
+                ? t
+                : t.done
+                  ? { ...t, done: false, firedGun: undefined, firedAt: undefined }
+                  : { ...t, done: true, firedGun: gun, firedAt: Date.now() },
+            ),
+          )
+        }}
         onRemove={remove}
       />
 

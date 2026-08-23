@@ -11,7 +11,7 @@ interface Props {
   onCharge: (charge: ChargeSetting) => void
   onGun: (gun: GunSetting) => void
   onImpact: (digits: string) => void
-  onFlightOverride: (value: string) => void
+  onToggleDone: () => void
   onRemove: () => void
 }
 
@@ -26,7 +26,7 @@ export function SolutionCard({
   onCharge,
   onGun,
   onImpact,
-  onFlightOverride,
+  onToggleDone,
   onRemove,
 }: Props) {
   const { solution, order, gun } = step
@@ -64,6 +64,15 @@ export function SolutionCard({
             </span>
           )}
         </div>
+
+        <button
+          className="card__done"
+          onClick={onToggleDone}
+          aria-label="撃ち終えた"
+          title="撃ち終えたら押す。射撃順から外れて完了一覧に移ります"
+        >
+          撃った
+        </button>
 
         <button className="card__remove" onClick={onRemove} aria-label="この目標を削除">
           ✕
@@ -125,7 +134,6 @@ export function SolutionCard({
           <dt>飛翔</dt>
           <dd>
             {solution.flightSeconds !== null ? formatFlight(solution.flightSeconds) : '—'}
-            {solution.flightOverridden && <span className="card__tag">手入力</span>}
           </dd>
         </div>
         <div>
@@ -143,7 +151,7 @@ export function SolutionCard({
       )}
 
       <div className="card__timing">
-        <label className="card__field">
+        <label className="card__field card__field--impact">
           <span className="card__k">着弾時刻</span>
           <input
             value={formatTimeDigits(target.impactDigits)}
@@ -159,21 +167,6 @@ export function SolutionCard({
           />
         </label>
 
-        <label
-          className="card__field card__field--override"
-          title="計算した飛翔時間の代わりに、ここに入れた値で発射時刻を出します。ゲーム内の表示と食い違ったときの逃げ道です"
-        >
-          <span className="card__k">飛翔上書き</span>
-          <input
-            value={target.flightOverride}
-            onChange={(e) => onFlightOverride(e.target.value)}
-            inputMode="decimal"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="計算値"
-            aria-invalid={target.flightOverride.trim() !== '' && !solution.flightOverridden}
-          />
-        </label>
       </div>
 
       <footer className={`card__launch${solution.launch === null ? ' is-empty' : ''}`}>

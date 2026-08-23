@@ -6,6 +6,7 @@ import {
   type GunSetting,
   type PlanStep,
 } from '../lib/targets'
+import { Loadout } from './Loadout'
 import { SolutionCard } from './SolutionCard'
 import { TurnIcon } from './TurnIcon'
 import { Turret } from './Turret'
@@ -16,7 +17,7 @@ interface Props {
   onCharge: (id: string, charge: ChargeSetting) => void
   onGun: (id: string, gun: GunSetting) => void
   onImpact: (id: string, digits: string) => void
-  onFlightOverride: (id: string, value: string) => void
+  onToggleDone: (id: string) => void
   onRemove: (id: string) => void
 }
 
@@ -47,10 +48,10 @@ export function FiringPlan({
   onCharge,
   onGun,
   onImpact,
-  onFlightOverride,
+  onToggleDone,
   onRemove,
 }: Props) {
-  const { steps, totalTurnDeg, unplaced } = plan
+  const { steps, totalTurnDeg, unplaced, done } = plan
   const rows = pairSteps(steps)
 
   const card = (step: PlanStep | null) => {
@@ -62,13 +63,13 @@ export function FiringPlan({
         onCharge={(charge) => onCharge(step.solution.target.id, charge)}
         onGun={(gun) => onGun(step.solution.target.id, gun)}
         onImpact={(digits) => onImpact(step.solution.target.id, digits)}
-        onFlightOverride={(value) => onFlightOverride(step.solution.target.id, value)}
+        onToggleDone={() => onToggleDone(step.solution.target.id)}
         onRemove={() => onRemove(step.solution.target.id)}
       />
     )
   }
 
-  if (steps.length === 0 && unplaced.length === 0) {
+  if (steps.length === 0 && unplaced.length === 0 && done.length === 0) {
     return (
       <section className="plan plan--empty">
         <Turret firstSide={null} />
@@ -94,17 +95,17 @@ export function FiringPlan({
         </div>
       </header>
 
-      <div className="plan__turret">
-        <Turret firstSide={steps[0]?.gun ?? null} />
-      </div>
+      <Loadout steps={steps} />
 
-      <div className="plan__cols">
-        {SIDES.map((side) => (
-          <h3 key={side} className="plan__column">
-            {SIDE_LABEL[side]}
-          </h3>
-        ))}
-      </div>
+      {steps.length > 0 && (
+        <div className="plan__cols">
+          {SIDES.map((side) => (
+            <h3 key={side} className="plan__column">
+              {SIDE_LABEL[side]}
+            </h3>
+          ))}
+        </div>
+      )}
 
       {rows.map((row, i) => (
         <div key={row.left?.solution.target.id ?? row.right?.solution.target.id ?? i}>
@@ -125,6 +126,32 @@ export function FiringPlan({
           </div>
         </div>
       ))}
+
+      {steps.length === 0 && (
+        <p className="plan__cleared">
+          残りの目標はありません{done.length > 0 ? ` — ${done.length} 発を撃ち終えました` : ''}
+        </p>
+      )}
+
+      {done.length > 0 && (
+        <div className="plan__done">
+          <h3>撃った — {done.length}</h3>
+          <ul>
+            {done.map((s) => (
+              <li key={s.target.id}>
+                <span className="plan__doneshell">{s.target.shell}</span>
+                {s.target.bearingDeg.toFixed(1)}° / {s.target.distanceKm.toFixed(2)} km
+                <button onClick={() => onToggleDone(s.target.id)} title="射撃順に戻す">
+                  戻す
+                </button>
+                <button onClick={() => onRemove(s.target.id)} aria-label="削除">
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {unplaced.length > 0 && (
         <div className="plan__unplaced">

@@ -22,7 +22,7 @@ import {
 } from './ballistics'
 import type { Side } from './guns'
 import { DEFAULT_SHELL, type ShellCode } from './shells'
-import { crossesMidnight, launchSod, parseDuration, parseTimeOfDay } from './time'
+import { crossesMidnight, launchSod, parseTimeOfDay } from './time'
 
 export type ChargeSetting = 'auto' | Charge
 export type GunSetting = 'auto' | Side
@@ -40,8 +40,12 @@ export interface Target {
   gun: GunSetting
   /** 着弾時刻（数字だけ）。空なら発射時刻は出さない。 */
   impactDigits: string
-  /** 飛翔時間の手動上書き。空なら計算値を使う。 */
-  flightOverride: string
+  /** 撃ち終えたか。射撃計画からは外れ、完了一覧に移る。 */
+  done: boolean
+  /** 撃ったときに使った砲。次の割り当てを続きから振るために残す。 */
+  firedGun?: Side
+  /** 撃った順を知るための時刻。いちばん新しいものが砲塔の現在位置になる。 */
+  firedAt?: number
 }
 
 export interface TargetSolution {
@@ -50,8 +54,6 @@ export interface TargetSolution {
   charge: Charge | null
   elevationDeg: number | null
   flightSeconds: number | null
-  /** 飛翔時間が手入力で上書きされているか。 */
-  flightOverridden: boolean
   impact: number | null
   launch: number | null
   prevDay: boolean
@@ -72,10 +74,12 @@ export interface PlanStep {
 
 export interface FiringPlan {
   steps: PlanStep[]
-  /** 全目標を撃ち終えるまでの旋回量の合計（度）。 */
+  /** 残りを撃ち終えるまでの旋回量の合計（度）。 */
   totalTurnDeg: number
   /** 射程外などで計画に載せられなかったもの。 */
   unplaced: TargetSolution[]
+  /** 撃ち終えたもの。順序は入力順のまま。 */
+  done: TargetSolution[]
 }
 
 export function newTarget(bearingDeg: number, distanceKm: number): Target {
@@ -87,7 +91,7 @@ export function newTarget(bearingDeg: number, distanceKm: number): Target {
     charge: 'auto',
     gun: 'auto',
     impactDigits: '',
-    flightOverride: '',
+    done: false,
   }
 }
 
@@ -177,10 +181,7 @@ export function solveTarget(target: Target): TargetSolution {
   const charge = target.charge === 'auto' ? requiredCharge(target.distanceKm) : target.charge
   const reachable = charge !== null && elevationDeg(target.distanceKm, charge) !== null
 
-  const computed = charge !== null ? flightSeconds(target.distanceKm, charge) : null
-  const override = parseDuration(target.flightOverride)
-  const flight = override ?? computed
-
+  const flight = charge !== null ? flightSeconds(target.distanceKm, charge) : null
   const impact = parseTimeOfDay(target.impactDigits)
   const solved = impact !== null && flight !== null
 
@@ -188,8 +189,7 @@ export function solveTarget(target: Target): TargetSolution {
     target,
     charge: reachable ? charge : null,
     elevationDeg: reachable ? elevationDeg(target.distanceKm, charge!) : null,
-    flightSeconds: reachable || override !== null ? flight : null,
-    flightOverridden: override !== null,
+    flightSeconds: reachable ? flight : null,
     impact,
     launch: solved ? launchSod(impact, flight) : null,
     prevDay: solved ? crossesMidnight(impact, flight) : false,
@@ -199,20 +199,11 @@ export function solveTarget(target: Target): TargetSolution {
 
 /* ---------- 射撃計画 ---------- */
 
-/**
- * 方位順に並べ替える。
- *
- * 目標は円周上に散らばっているので、全部を回るのに必要な旋回量は
- * 「一周 − いちばん広く空いている隙間」で最小になる。その隙間の直後から
- * 一方向に回れば、余計な往復が一切なくなる。
- */
-function orderByBearing(solutions: readonly TargetSolution[]): TargetSolution[] {
-  if (solutions.length <= 1) return [...solutions]
-
-  const sorted = [...solutions].sort(
-    (a, b) => a.target.bearingDeg - b.target.bearingDeg,
-  )
-
+/** 円周上に散らばった目標を覆う弧を求める。いちばん広い隙間の外側が弧になる。 */
+function coveringArc(sorted: readonly TargetSolution[]): {
+  first: number
+  arcLength: number
+} {
   let gapIndex = 0
   let widest = -1
   for (let i = 0; i < sorted.length; i++) {
@@ -224,8 +215,38 @@ function orderByBearing(solutions: readonly TargetSolution[]): TargetSolution[] 
       gapIndex = (i + 1) % sorted.length
     }
   }
+  return { first: gapIndex, arcLength: 360 - widest }
+}
 
-  return [...sorted.slice(gapIndex), ...sorted.slice(0, gapIndex)]
+/**
+ * 射撃順に並べ替える。
+ *
+ * 目標は円周上に散らばっているので、全部を回るのに必要な旋回量は
+ * 「一周 − いちばん広く空いている隙間」で最小になる。その隙間を跨がずに
+ * 一方向へ回れば、余計な往復が一切なくなる。
+ *
+ * すでに撃った弾があるときは、砲塔はその目標の方位を向いたままなので、
+ * そこから弧の手前端へ寄って時計回りに舐めるか、奥端へ寄って反時計回りに
+ * 舐めるかの安い方を選ぶ。後者では左回りが出る。
+ */
+function orderByBearing(
+  solutions: readonly TargetSolution[],
+  fromBearing: number | null,
+): TargetSolution[] {
+  if (solutions.length <= 1) return [...solutions]
+
+  const sorted = [...solutions].sort((a, b) => a.target.bearingDeg - b.target.bearingDeg)
+  const { first, arcLength } = coveringArc(sorted)
+
+  const clockwise = [...sorted.slice(first), ...sorted.slice(0, first)]
+  if (fromBearing === null) return clockwise
+
+  const counter = [...clockwise].reverse()
+  const approachCw = Math.abs(bearingDelta(fromBearing, clockwise[0]!.target.bearingDeg))
+  const approachCcw = Math.abs(bearingDelta(fromBearing, counter[0]!.target.bearingDeg))
+
+  // 弧を舐める距離はどちら回りでも同じなので、寄せる距離だけで決まる
+  return approachCcw + arcLength < approachCw + arcLength ? counter : clockwise
 }
 
 /**
@@ -236,12 +257,27 @@ function orderByBearing(solutions: readonly TargetSolution[]): TargetSolution[] 
  */
 export function buildPlan(targets: readonly Target[]): FiringPlan {
   const solutions = targets.map(solveTarget)
-  const placeable = solutions.filter((s) => !s.outOfRange)
-  const unplaced = solutions.filter((s) => s.outOfRange)
+  // 撃ち終えた目標は旋回にも射撃順にも関わらないので、まず外す
+  const done = solutions.filter((s) => s.target.done)
+  const remaining = solutions.filter((s) => !s.target.done)
+  const placeable = remaining.filter((s) => !s.outOfRange)
+  const unplaced = remaining.filter((s) => s.outOfRange)
 
-  const ordered = orderByBearing(placeable)
+  // 最後に撃った 1 発が、砲塔の現在の方位と直前に使った砲を教えてくれる。
+  // これを引き継がないと、1 発撃つたびに左右の割り当てが入れ替わって、
+  // 先に装填しておいた弾が無駄になる。
+  const lastFired = done.reduce<TargetSolution | null>(
+    (latest, s) =>
+      s.target.firedAt !== undefined &&
+      (latest === null || s.target.firedAt > latest.target.firedAt!)
+        ? s
+        : latest,
+    null,
+  )
 
-  let lastGun: Side | null = null
+  const ordered = orderByBearing(placeable, lastFired?.target.bearingDeg ?? null)
+
+  let lastGun: Side | null = lastFired?.target.firedGun ?? null
   let totalTurnDeg = 0
 
   const steps: PlanStep[] = ordered.map((solution, i) => {
@@ -255,7 +291,9 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
     const prev = ordered[i - 1]
     const turnFromPrev =
       prev === undefined
-        ? null
+        ? lastFired === null
+          ? null
+          : bearingDelta(lastFired.target.bearingDeg, solution.target.bearingDeg)
         : bearingDelta(prev.target.bearingDeg, solution.target.bearingDeg)
     if (turnFromPrev !== null) totalTurnDeg += Math.abs(turnFromPrev)
 
@@ -265,7 +303,7 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
     return { solution, order: i + 1, gun, turnFromPrev, reloadStall }
   })
 
-  return { steps, totalTurnDeg, unplaced }
+  return { steps, totalTurnDeg, unplaced, done }
 }
 
 /* ---------- 行への組み分け ---------- */

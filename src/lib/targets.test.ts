@@ -126,13 +126,6 @@ describe('目標の解', () => {
     expect(formatTimeOfDay(s.launch!, 2)).toBe('10:09:37.68')
   })
 
-  it('飛翔時間は手で上書きできる', () => {
-    const s = solveTarget(at(0, 12.36, { charge: 3, flightOverride: '40', impactDigits: '101010' }))
-    expect(s.flightOverridden).toBe(true)
-    expect(s.flightSeconds).toBe(40)
-    expect(formatTimeOfDay(s.launch!)).toBe('10:09:30')
-  })
-
   it('着弾時刻が無ければ発射時刻は出ないが仰角は出る', () => {
     const s = solveTarget(at(0, 6.16))
     expect(s.launch).toBeNull()
@@ -247,7 +240,7 @@ describe('行への組み分け', () => {
 })
 
 describe('旋回の向き', () => {
-  it('いちばん広い隙間を通らないので、旋回は常に右回りになる', () => {
+  it('まだ撃っていないうちは、いちばん広い隙間を通らないので常に右回り', () => {
     // 円周上のどこに散らばらせても、180 度を超える隙間は最大の 1 つしか
     // 存在しえない。その隙間を跨がない順路なので、逆回りは発生しない。
     const cases = [
@@ -269,5 +262,107 @@ describe('旋回の向き', () => {
   it('総旋回は「一周 − 最大の隙間」になる', () => {
     const plan = buildPlan([0, 90, 180, 270].map((b) => at(b, 5)))
     expect(plan.totalTurnDeg).toBeCloseTo(270) // 隙間はすべて 90 度
+  })
+})
+
+describe('完了', () => {
+  it('撃ち終えた目標は射撃順から外れ、完了一覧に移る', () => {
+    const plan = buildPlan([at(10, 5), at(20, 5, { done: true }), at(30, 5)])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([10, 30])
+    expect(plan.done.map((s) => s.target.bearingDeg)).toEqual([20])
+  })
+
+  it('完了ぶんは旋回量に数えない', () => {
+    // 10 → 20 → 30 で 20 度。20 を撃ち終えると 10 → 30 の 20 度のまま
+    expect(buildPlan([at(10, 5), at(20, 5), at(30, 5)]).totalTurnDeg).toBeCloseTo(20)
+    const after = buildPlan([at(10, 5), at(20, 5, { done: true }), at(30, 5)])
+    expect(after.totalTurnDeg).toBeCloseTo(20)
+    // 端を撃ち終えれば減る
+    const trimmed = buildPlan([at(10, 5, { done: true }), at(20, 5), at(30, 5)])
+    expect(trimmed.totalTurnDeg).toBeCloseTo(10)
+  })
+
+  it('完了で次に撃つ砲が入れ替わる', () => {
+    const before = buildPlan([at(10, 5), at(20, 5)])
+    expect(before.steps[0]!.gun).toBe('left')
+    const after = buildPlan([at(10, 5, { done: true }), at(20, 5)])
+    expect(after.steps[0]!.solution.target.bearingDeg).toBe(20)
+    expect(after.steps[0]!.gun).toBe('left') // 残りの先頭から改めて交互に振り直す
+  })
+
+  it('全部撃ち終えたら射撃順は空になる', () => {
+    const plan = buildPlan([at(10, 5, { done: true }), at(20, 5, { done: true })])
+    expect(plan.steps).toEqual([])
+    expect(plan.done).toHaveLength(2)
+    expect(plan.totalTurnDeg).toBe(0)
+  })
+
+  it('射程外の目標を撃ち終え扱いにしたら完了側に入る', () => {
+    const plan = buildPlan([at(10, 40, { done: true })])
+    expect(plan.unplaced).toEqual([])
+    expect(plan.done).toHaveLength(1)
+  })
+})
+
+describe('撃った後の引き継ぎ', () => {
+  const fired = (bearing: number, gun: 'left' | 'right', at: number) =>
+    at_(bearing, 5, { done: true, firedGun: gun, firedAt: at })
+
+  /** at() は done を渡せないので、ここでは素の Target を組む */
+  const at_ = (b: number, d: number, patch: Partial<Target>): Target => ({
+    ...newTarget(b, d),
+    ...patch,
+  })
+
+  it('直前に使った砲の反対から割り当てを続ける', () => {
+    // 左砲で撃った直後なら、次は右砲から始まる
+    const plan = buildPlan([fired(10, 'left', 1), at(20, 5), at(30, 5)])
+    expect(plan.steps.map((s) => s.gun)).toEqual(['right', 'left'])
+  })
+
+  it('撃つたびに左右が入れ替わらない', () => {
+    const targets = [at(10, 5), at(20, 5), at(30, 5), at(40, 5)]
+    const before = buildPlan(targets)
+    const gunOf = (p: ReturnType<typeof buildPlan>, bearing: number) =>
+      p.steps.find((s) => s.solution.target.bearingDeg === bearing)?.gun
+
+    expect(gunOf(before, 20)).toBe('right')
+
+    // 1 発目を撃った体で組み直しても、2 発目の砲は変わらない
+    const after = buildPlan([
+      { ...targets[0]!, done: true, firedGun: before.steps[0]!.gun, firedAt: 1 },
+      ...targets.slice(1),
+    ])
+    expect(gunOf(after, 20)).toBe('right')
+    expect(gunOf(after, 30)).toBe(gunOf(before, 30))
+  })
+
+  it('砲塔の現在位置から、寄せるのが安い側へ回る', () => {
+    // 残りは 10 と 20。砲塔は 30 を向いている。奥端 20 に寄って反時計回りが安い。
+    const plan = buildPlan([fired(30, 'left', 1), at(10, 5), at(20, 5)])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([20, 10])
+    expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(-10) // 左へ 10 度
+    expect(plan.steps[1]!.turnFromPrev).toBeCloseTo(-10)
+    expect(plan.totalTurnDeg).toBeCloseTo(20)
+  })
+
+  it('手前端に寄る方が安ければ時計回りのまま', () => {
+    // 砲塔は 5 を向いている。手前端 10 に寄って時計回りが安い。
+    const plan = buildPlan([fired(5, 'left', 1), at(10, 5), at(20, 5)])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([10, 20])
+    expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(5)
+  })
+
+  it('最初の旋回は砲塔の現在位置からの量になる', () => {
+    const plan = buildPlan([fired(0, 'left', 1), at(40, 5)])
+    expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(40)
+    expect(plan.totalTurnDeg).toBeCloseTo(40)
+  })
+
+  it('いちばん新しく撃った 1 発を現在位置とする', () => {
+    const plan = buildPlan([fired(0, 'left', 1), fired(200, 'right', 9), at(210, 5)])
+    // 200 を向いているので 210 までは 10 度
+    expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(10)
+    expect(plan.steps[0]!.gun).toBe('left') // 直前が右砲
   })
 })
