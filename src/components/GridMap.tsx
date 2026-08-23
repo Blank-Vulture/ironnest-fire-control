@@ -72,6 +72,8 @@ interface Marker {
   color: string
   /** 撃ち終えた点。印に取り消しの輪を重ねる。 */
   struck?: boolean
+  /** 撃破された観測員。印を抜いて、残っている観測員と見分ける。 */
+  lost?: boolean
 }
 
 /**
@@ -164,6 +166,7 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
       name: point.label,
       at,
       color: colorOf(point.id),
+      lost: point.lost === true,
     })
   }
   for (const resolved of survey.fixes) {
@@ -429,7 +432,7 @@ function Pin({ marker, px, active, dim, onEnter, onLeave, onPick }: PinProps) {
     <g
       className={`pin pin--${kind}${active ? ' is-active' : ''}${dim ? ' is-dim' : ''}${
         marker.struck === true ? ' is-struck' : ''
-      }`}
+      }${marker.lost === true ? ' is-lost' : ''}`}
       style={{ color: marker.color }}
       onPointerEnter={onEnter}
       onPointerLeave={onLeave}
@@ -444,7 +447,19 @@ function Pin({ marker, px, active, dim, onEnter, onLeave, onPick }: PinProps) {
           />
         </>
       )}
-      {kind === 'known' && <circle className="pin__dot" cx={cx} cy={cy} r={px(7)} />}
+      {kind === 'known' &&
+        (marker.lost === true ? (
+          // 撃破された観測員。中を抜いて×を重ね、残っている観測員と見分ける
+          <>
+            <circle className="pin__gone" cx={cx} cy={cy} r={px(7)} />
+            <path
+              className="pin__gonemark"
+              d={`M ${cx - px(5)} ${cy - px(5)} L ${cx + px(5)} ${cy + px(5)} M ${cx + px(5)} ${cy - px(5)} L ${cx - px(5)} ${cy + px(5)}`}
+            />
+          </>
+        ) : (
+          <circle className="pin__dot" cx={cx} cy={cy} r={px(7)} />
+        ))}
       {kind === 'fix' && (
         <path
           className="pin__x"
@@ -464,7 +479,7 @@ function Pin({ marker, px, active, dim, onEnter, onLeave, onPick }: PinProps) {
         y={kind === 'nest' ? cy - px(26) : kind === 'known' ? cy - px(13) : cy + px(24)}
         fontSize={px(10)}
       >
-        {name}
+        {marker.lost === true ? `${name}（撃破）` : name}
       </text>
 
       {/* 指でも掴めるだけの当たり判定。見た目には出さない */}

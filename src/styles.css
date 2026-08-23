@@ -330,6 +330,24 @@ code {
   vector-effect: non-scaling-stroke;
 }
 
+/* 撃破された観測員。過去の報告は生きているので、線や円はそのまま残す */
+.pin__gone {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.pin__gonemark {
+  stroke: currentColor;
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.pin.is-lost {
+  opacity: 0.5;
+}
+
 /* 撃ち終えた点。輪を重ねて、まだ残っている目標と見分ける */
 .pin__struck {
   fill: none;
