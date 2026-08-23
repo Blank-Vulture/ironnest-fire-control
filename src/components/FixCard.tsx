@@ -1,5 +1,7 @@
 import { formatPoint, parseGrid } from '../lib/grid'
 import { SHALLOW_CROSSING_DEG, firingSolutionFrom } from '../lib/triangulate'
+import { estimateAccuracy } from '../lib/accuracy'
+import { FixAdvice } from './FixAdvice'
 import { DEFAULT_SHELL, SHELLS } from '../lib/shells'
 import type { Point } from '../lib/grid'
 import type { Fix, KnownPoint, ResolvedFix, Sighting } from '../lib/survey'
@@ -246,6 +248,20 @@ export function FixCard({
       </button>
 
       <FixStatusLine resolved={resolved} shallow={shallow} />
+
+      {/*
+        報告の幅が位置の誤差にどれだけ化けるかと、それを縮めるための次の一手。
+        実測で確定している点は幅が無いので出さない。
+      */}
+      {position !== null && !resolved.pinned && resolved.observations.length > 0 && (
+        <FixAdvice
+          position={position}
+          alternative={resolved.alternative}
+          accuracy={estimateAccuracy(resolved.observations, position)}
+          observations={resolved.observations}
+          shell={fix.shell ?? DEFAULT_SHELL}
+        />
+      )}
 
       {resolved.alternative !== null && (
         <div className="fix__alt">

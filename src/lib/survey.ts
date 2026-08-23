@@ -120,6 +120,11 @@ export type FixStatus =
 export interface ResolvedFix {
   fix: Fix
   status: FixStatus
+  /**
+   * 実際に使った観測。位置が解けた観測元だけが入る。
+   * 見込み誤差を測るのに、報告そのものが要る。
+   */
+  observations: Observation[]
   /** 実測座標で確定しているか。三角測量の結果ではない。 */
   pinned: boolean
   /** この点自身の推定に伴う食い違い（km）。 */
@@ -197,6 +202,7 @@ function knownPositions(known: readonly KnownPoint[]): Map<PointId, Point> {
 function toObservations(
   sightings: readonly Sighting[],
   positions: ReadonlyMap<PointId, Point>,
+  nameOf: (id: PointId) => string,
 ): { observations: Observation[]; missing: PointId[] } {
   const observations: Observation[] = []
   const missing: PointId[] = []
@@ -211,7 +217,14 @@ function toObservations(
       missing.push(sighting.fromId)
       continue
     }
-    observations.push({ id: sighting.id, label: sighting.fromId, position, bearingDeg, rangeKm })
+    // label は画面に出す名前。観測元をたどるのは fromId 側の仕事にする
+    observations.push({
+      id: sighting.id,
+      label: nameOf(sighting.fromId),
+      position,
+      bearingDeg,
+      rangeKm,
+    })
   }
 
   return { observations, missing }
@@ -222,11 +235,13 @@ function fromTriangulation(
   result: Triangulation,
   sourceUncertainty: number,
   chained: boolean,
+  observations: Observation[],
 ): ResolvedFix {
   if (result.kind !== 'solved') {
     return {
       fix,
       status: result,
+      observations,
       pinned: false,
       residualKm: 0,
       accumulatedKm: 0,
@@ -248,6 +263,7 @@ function fromTriangulation(
   return {
     fix,
     status: { kind: 'solved', position, residualKm: estimate.residualKm },
+    observations,
     pinned: false,
     residualKm: estimate.residualKm,
     // 観測元がすでに推定値なら、その不確かさはそのまま持ち越される
@@ -286,6 +302,7 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
         resolved.set(fix.id, {
           fix,
           status: { kind: 'solved', position, residualKm: 0 },
+          observations: [],
           pinned: true,
           residualKm: 0,
           accumulatedKm: 0,
@@ -299,18 +316,27 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
         continue
       }
 
-      const { observations, missing } = toObservations(fix.sightings, positions)
+      const { observations, missing } = toObservations(fix.sightings, positions, (id) =>
+        labelOf(doc, id),
+      )
       if (missing.length > 0) continue // まだ観測元が揃っていない。次の周回で拾う
 
       const chained = fix.sightings.some(
         (s) => doc.fixes.some((f) => f.id === s.fromId) && positions.has(s.fromId),
       )
-      const sourceUncertainty = observations.reduce(
-        (worst, o) => Math.max(worst, uncertainty.get(o.label) ?? 0),
+      // 観測元が推定値なら、その不確かさを引き継ぐ。名前ではなく id で引く
+      const sourceUncertainty = fix.sightings.reduce(
+        (worst, sighting) => Math.max(worst, uncertainty.get(sighting.fromId) ?? 0),
         0,
       )
 
-      const entry = fromTriangulation(fix, triangulate(observations), sourceUncertainty, chained)
+      const entry = fromTriangulation(
+        fix,
+        triangulate(observations),
+        sourceUncertainty,
+        chained,
+        observations,
+      )
       resolved.set(fix.id, entry)
       progressed = true
 
@@ -335,6 +361,7 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
     resolved.set(fix.id, {
       fix,
       status: { kind: 'pending', missing },
+      observations: [],
       pinned: false,
       residualKm: 0,
       accumulatedKm: 0,
