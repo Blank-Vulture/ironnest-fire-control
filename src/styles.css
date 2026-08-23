@@ -2651,6 +2651,17 @@ code {
   color: var(--danger);
 }
 
+/* 撃ち終えたカード。左右そろうまでその場に残すので、沈めて見分ける */
+.card.is-fired {
+  filter: saturate(0.45);
+  opacity: 0.72;
+}
+
+.card__done.is-on {
+  background: var(--stamp);
+  border-color: var(--stamp);
+}
+
 /* 確認射撃のカード。普通の攻撃と取り違えないよう縁で見分ける */
 .card.is-verifying {
   border-top: 3px solid var(--ink);

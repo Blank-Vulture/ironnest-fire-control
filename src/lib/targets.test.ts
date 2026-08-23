@@ -663,3 +663,45 @@ describe('弾種の同期', () => {
     expect(next.find((t) => t.id === 'd')?.shell).toBe('HE')
   })
 })
+
+describe('射撃順の番号', () => {
+  const many = (n: number) => Array.from({ length: n }, (_, i) => at(10 + i * 5, 5))
+
+  it('撃ち終えたぶんの続きから振る', () => {
+    const targets = many(4)
+    const before = buildPlan(targets)
+    expect(before.steps.map((s) => s.order)).toEqual([1, 2, 3, 4])
+
+    // 1 発目を撃つ
+    const after = buildPlan([
+      { ...targets[0]!, done: true, firedGun: before.steps[0]!.gun, firedAt: 1 },
+      ...targets.slice(1),
+    ])
+    expect(after.steps.map((s) => s.order)).toEqual([2, 3, 4])
+  })
+
+  it('撃っても残りの番号が動かない', () => {
+    const targets = many(4)
+    const before = buildPlan(targets)
+    const orderOf = (plan: ReturnType<typeof buildPlan>, bearing: number) =>
+      plan.steps.find((s) => s.solution.target.bearingDeg === bearing)?.order
+
+    const after = buildPlan([
+      { ...targets[0]!, done: true, firedGun: before.steps[0]!.gun, firedAt: 1 },
+      ...targets.slice(1),
+    ])
+    for (const bearing of [15, 20, 25]) {
+      expect(orderOf(after, bearing), `方位 ${bearing}`).toBe(orderOf(before, bearing))
+    }
+  })
+
+  it('何発撃っても番号は繰り上がらない', () => {
+    const targets = many(4)
+    const plan = buildPlan(
+      targets.map((t, i) =>
+        i < 2 ? { ...t, done: true, firedAt: i + 1, firedGun: 'left' as const } : t,
+      ),
+    )
+    expect(plan.steps.map((s) => s.order)).toEqual([3, 4])
+  })
+})

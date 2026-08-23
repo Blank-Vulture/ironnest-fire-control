@@ -52,7 +52,7 @@ export function SolutionCard({
     <article
       className={`card card--${gun}${unreachable ? ' is-unreachable' : ''}${
         verifying ? ' is-verifying' : ''
-      }`}
+      }${target.done ? ' is-fired' : ''}`}
     >
       <header className="card__head">
         <span className="card__order" title="射撃順">
@@ -83,12 +83,17 @@ export function SolutionCard({
         </div>
 
         <button
-          className="card__done"
+          className={`card__done${target.done ? ' is-on' : ''}`}
           onClick={onToggleDone}
           aria-label="撃ち終えた"
-          title="撃ち終えたら押す。射撃順から外れて完了一覧に移ります"
+          aria-pressed={target.done}
+          title={
+            target.done
+              ? '撃ち終えた印が付いています。押すと戻します'
+              : '撃ち終えたら押す。左右そろったらこの行が畳まれます'
+          }
         >
-          撃った
+          {target.done ? '✓ 撃った' : '撃った'}
         </button>
 
         <button className="card__remove" onClick={onRemove} aria-label="この目標を削除">

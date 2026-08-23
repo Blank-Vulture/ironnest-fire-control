@@ -100,6 +100,7 @@ export interface PlanStep {
 }
 
 export interface FiringPlan {
+  /** これから撃つぶん。番号は撃ち終えたぶんの続きから振る。 */
   steps: PlanStep[]
   /** 残りを撃ち終えるまでの旋回量の合計（度）。 */
   totalTurnDeg: number
@@ -333,7 +334,9 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
 
     return {
       solution,
-      order: i + 1,
+      // 撃ち終えたぶんを数に含めて続きから振る。ここで詰め直すと、
+      // 1 発撃つたびに残りの番号がずれて、どれを撃つ順番だったか分からなくなる。
+      order: done.length + i + 1,
       gun,
       magIndex,
       needsResupply: magIndex >= READY_ROUNDS_PER_GUN,

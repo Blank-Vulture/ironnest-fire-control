@@ -227,14 +227,19 @@ export function App() {
   const toggleDone = useCallback(
     (id: string) => {
       // 撃った時点の砲と時刻を残す。次の割り当てをその続きから振るため。
-      const gun = plan.steps.find((step) => step.solution.target.id === id)?.gun
+      const step = plan.steps.find((s) => s.solution.target.id === id)
       setTargets((prev) =>
         prev.map((t) =>
           t.id !== id
             ? t
             : t.done
-              ? { ...t, done: false, firedGun: undefined, firedAt: undefined }
-              : { ...t, done: true, firedGun: gun, firedAt: Date.now() },
+              ? {
+                  ...t,
+                  done: false,
+                  firedGun: undefined,
+                  firedAt: undefined,
+                }
+              : { ...t, done: true, firedGun: step?.gun, firedAt: Date.now() },
         ),
       )
     },

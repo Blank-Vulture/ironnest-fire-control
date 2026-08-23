@@ -66,7 +66,42 @@ export function FiringPlan({
   onRemove,
 }: Props) {
   const { steps, totalTurnDeg, unplaced, done } = plan
-  const rows = pairSteps(steps)
+
+  /**
+   * 撃ち終えたカードも、その場に残して印だけ付ける。
+   *
+   * 撃つたびに列から抜けると、残りが繰り上がって「次はどれだったか」が
+   * 分からなくなる。左右そろって撃ち終えた行だけを畳む。
+   */
+  const firedSteps: PlanStep[] = [...done]
+    .sort((a, b) => (a.target.firedAt ?? 0) - (b.target.firedAt ?? 0))
+    .map((solution, i) => ({
+      solution,
+      // 撃った順の通し番号。これから撃つぶんはその続きから振られるので、
+      // 撃っても番号が動かず、重複も欠番も出ない。
+      order: i + 1,
+      gun: solution.target.firedGun ?? 'left',
+      magIndex: 0,
+      needsResupply: false,
+      turnFromPrev: null,
+      reloadStall: false,
+    }))
+
+  const shown = [...firedSteps, ...steps].sort((a, b) => a.order - b.order)
+  const rows = pairSteps(shown)
+
+  const rowIsCleared = (row: (typeof rows)[number]) =>
+    [row.left, row.right].every((step) => step === null || step.solution.target.done)
+
+  // 行ごと畳んだものだけを下の一覧に回す。その場に残っているぶんと重ねない
+  const clearedIds = new Set(
+    rows
+      .filter(rowIsCleared)
+      .flatMap((row) => [row.left, row.right])
+      .filter((step) => step !== null)
+      .map((step) => step!.solution.target.id),
+  )
+  const cleared = done.filter((solution) => clearedIds.has(solution.target.id))
 
   /**
    * 行の片側 1 マス。
@@ -147,7 +182,7 @@ export function FiringPlan({
         </div>
       )}
 
-      {rows.map((row, i) => (
+      {rows.filter((row) => !rowIsCleared(row)).map((row, i) => (
         <div key={row.left?.solution.target.id ?? row.right?.solution.target.id ?? i}>
           {row.leadTurn !== null && <Turn deg={row.leadTurn} className="turn--lead" />}
 
@@ -173,11 +208,11 @@ export function FiringPlan({
         </p>
       )}
 
-      {done.length > 0 && (
+      {cleared.length > 0 && (
         <div className="plan__done">
-          <h3>撃った — {done.length}</h3>
+          <h3>撃った — {cleared.length}</h3>
           <ul>
-            {done.map((s) => (
+            {cleared.map((s) => (
               <li key={s.target.id}>
                 <span className="plan__doneshell">{s.target.shell}</span>
                 {s.target.bearingDeg.toFixed(1)}° / {s.target.distanceKm.toFixed(2)} km
