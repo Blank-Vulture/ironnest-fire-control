@@ -334,7 +334,7 @@ code {
   vector-effect: non-scaling-stroke;
 }
 
-/* 撃破された観測員。過去の報告は生きているので、線や円はそのまま残す */
+/* 撃破された偵察兵。過去の報告は生きているので、線や円はそのまま残す */
 .pin__gone {
   fill: none;
   stroke: currentColor;
@@ -1434,7 +1434,7 @@ code {
   background: var(--panel-2);
 }
 
-/* ---------- 観測員の生存 ---------- */
+/* ---------- 偵察兵の生存 ---------- */
 
 .known__alive {
   background: none;
@@ -1455,7 +1455,7 @@ code {
   color: var(--danger);
 }
 
-/* 撃破された観測員。過去の報告は生きているので、消さずに沈めるだけ */
+/* 撃破された偵察兵。過去の報告は生きているので、消さずに沈めるだけ */
 .known__row.is-lost {
   opacity: 0.5;
   border-style: dashed;
@@ -1705,7 +1705,7 @@ code {
   background: var(--panel-2);
 }
 
-/* ---------- 観測員の生存 ---------- */
+/* ---------- 偵察兵の生存 ---------- */
 
 .known__alive {
   background: none;
@@ -1726,7 +1726,7 @@ code {
   color: var(--danger);
 }
 
-/* 撃破された観測員。過去の報告は生きているので、消さずに沈めるだけ */
+/* 撃破された偵察兵。過去の報告は生きているので、消さずに沈めるだけ */
 .known__row.is-lost {
   opacity: 0.5;
   border-style: dashed;

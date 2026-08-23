@@ -49,7 +49,7 @@ const id = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 
 export function newKnownPoint(index: number): KnownPoint {
-  return { id: id('k'), label: `観測員 ${index}`, gridInput: '', isNest: false, kind: 'spotter' }
+  return { id: id('k'), label: `偵察兵 ${index}`, gridInput: '', isNest: false, kind: 'spotter' }
 }
 
 export function newReferencePoint(doc: SurveyDoc): KnownPoint {
@@ -62,7 +62,7 @@ export function newReferencePoint(doc: SurveyDoc): KnownPoint {
   }
 }
 
-/** 報告を寄こすのはたいてい観測員なので、健在な観測員を順に既定にする。 */
+/** 報告を寄こすのはたいてい偵察兵なので、健在な偵察兵を順に既定にする。 */
 function defaultSources(doc: SurveyDoc): string[] {
   return doc.known
     .filter((k) => !k.isNest && k.parentId === undefined && k.kind !== 'reference' && k.lost !== true)
@@ -78,7 +78,7 @@ export function newFix(doc: SurveyDoc): Fix {
   return {
     id: id('f'),
     label: nextTargetLabel(doc),
-    // 位置を決めるには 2 つ要るので、別々の観測員を初めから当てておく
+    // 位置を決めるには 2 つ要るので、別々の偵察兵を初めから当てておく
     sightings: [newSighting(first), newSighting(second ?? first)],
     isReference: false,
     // 撃つために作ることがほとんどなので、攻撃対象は既定でオン
@@ -92,7 +92,7 @@ export function emptySurveyDoc(): SurveyDoc {
   const doc: SurveyDoc = {
     known: [
       { id: id('k'), label: NEST_LABEL, gridInput: '', isNest: true },
-      // 観測員は基本 3 人つく
+      // 偵察兵は基本 3 人つく
       newKnownPoint(1),
       newKnownPoint(2),
       newKnownPoint(3),
@@ -105,7 +105,7 @@ export function emptySurveyDoc(): SurveyDoc {
 /**
  * 標定の画面。
  *
- * 既知点（観測員と砲座）と、そこから割り出す標定点を分けて置く。
+ * 既知点（偵察兵と砲座）と、そこから割り出す標定点を分けて置く。
  * 標定点は既知点だけでなく、先に解けた標定点も観測元にできるので、
  * 「距離が重なる地点をまず出し、そこからの方位で目標を出す」という
  * 段を重ねた任務がそのまま組める。
@@ -130,7 +130,7 @@ export function Plotting({
   const patchFix = (fixId: string, change: Partial<Fix>) =>
     onChange({ ...doc, fixes: doc.fixes.map((f) => (f.id === fixId ? { ...f, ...change } : f)) })
 
-  /** 名簿をまとめて貼ると、砲座の行と観測員の行に振り分ける。 */
+  /** 名簿をまとめて貼ると、砲座の行と偵察兵の行に振り分ける。 */
   const handlePaste = (event: React.ClipboardEvent) => {
     const { entries, bad } = parseRoster(event.clipboardData.getData('text'))
     if (entries.length === 0) return
@@ -151,7 +151,7 @@ export function Plotting({
         },
         ...others.map((entry, i) => ({
           id: id('k'),
-          label: entry.label || `観測員 ${i + 1}`,
+          label: entry.label || `偵察兵 ${i + 1}`,
           gridInput: formatEntryGrid(entry.grid),
           isNest: false,
           kind: 'spotter' as const,
@@ -241,7 +241,7 @@ export function Plotting({
     })
   }
 
-  // 自機は観測員でも目標でもないので、専用の区画に出す。
+  // 自機は偵察兵でも目標でもないので、専用の区画に出す。
   // 補給隊もその流れの一部なので、既知点の一覧には並べない。
   const nest = doc.known.find((k) => k.isNest)
   const convoys = doc.known.filter((k) => nest !== undefined && k.parentId === nest.id)
@@ -303,7 +303,7 @@ export function Plotting({
         {/* 報告を寄こす側と、位置だけが分かっている側。役割が違うので列を分ける */}
         <div className="known__columns">
           <div className="known__col">
-            <h3 className="known__group">観測員</h3>
+            <h3 className="known__group">偵察兵</h3>
 
             <ol className="known__list">
               {spotters.map((point) => {
@@ -332,7 +332,7 @@ export function Plotting({
                       value={point.label}
                       onChange={(e) => patchKnown(point.id, { label: e.target.value })}
                       spellCheck={false}
-                      aria-label="観測員の名前"
+                      aria-label="偵察兵の名前"
                     />
                     <input
                       className={`known__grid${bad ? ' is-invalid' : ''}`}
@@ -348,7 +348,7 @@ export function Plotting({
                     <button
                       className="known__remove"
                       onClick={() => {
-                        onRemember('観測員を削除')
+                        onRemember('偵察兵を削除')
                         onChange({ ...doc, known: doc.known.filter((k) => k.id !== point.id) })
                       }}
                       title="削除"
@@ -367,7 +367,7 @@ export function Plotting({
                 onChange({ ...doc, known: [...doc.known, newKnownPoint(spotters.length + 1)] })
               }
             >
-              ＋ 観測員
+              ＋ 偵察兵
             </button>
           </div>
 
@@ -559,7 +559,7 @@ export function Plotting({
                 patchFix(resolved.fix.id, {
                   sightings: [
                     ...resolved.fix.sightings,
-                    // まだ使っていない観測員がいれば、それを既定にする
+                    // まだ使っていない偵察兵がいれば、それを既定にする
                     newSighting(
                       defaultSources(doc).find(
                         (candidate) =>

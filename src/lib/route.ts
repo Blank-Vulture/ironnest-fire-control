@@ -16,7 +16,7 @@ export const ROUTE_TITLE: Record<Route, { name: string; jp: string; note: string
   plotting: {
     name: 'PLOTTING',
     jp: '標定',
-    note: '観測員の報告から目標の位置を割り出す',
+    note: '偵察兵の報告から目標の位置を割り出す',
   },
 }
 

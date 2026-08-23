@@ -163,7 +163,7 @@ export function FixCard({
               onChange={(e) => onSighting(sighting.id, { fromId: e.target.value })}
               aria-label="観測元"
             >
-              <option value="">— 観測員 —</option>
+              <option value="">— 偵察兵 —</option>
               {sources.map((source) => (
                 <option key={source.id} value={source.id}>
                   {source.label}

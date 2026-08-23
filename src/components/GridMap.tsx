@@ -26,7 +26,7 @@ const LETTERS = 'ABCDEFGHIJKLMNOPQRST'
 /**
  * ゲーム内のマーカートークンに合わせる。友軍が青、敵と目標が赤、自機が黄。
  *
- * 観測員はすべて青にすると誰の報告か追えなくなるので、色相は青のまま
+ * 偵察兵はすべて青にすると誰の報告か追えなくなるので、色相は青のまま
  * 明るさだけを変えて見分ける。青の一族という括りは崩さない。
  */
 const FRIENDLY_HUE = 205
@@ -78,7 +78,7 @@ interface Marker {
   color: string
   /** 撃ち終えた点。印に取り消しの輪を重ねる。 */
   struck?: boolean
-  /** 撃破された観測員。印を抜いて、残っている観測員と見分ける。 */
+  /** 撃破された偵察兵。印を抜いて、残っている偵察兵と見分ける。 */
   lost?: boolean
 }
 
@@ -121,7 +121,7 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
   const px = (n: number) => n * perPixel
 
   /**
-   * 観測元の色。自機は黄、観測員は青の濃淡、標定した点は赤。
+   * 観測元の色。自機は黄、偵察兵は青の濃淡、標定した点は赤。
    * その点から引いた円や線も同じ色になるので、どこからの報告か辿れる。
    */
   const spotters = doc.known.filter((k) => !k.isNest && k.kind !== 'reference')
@@ -459,7 +459,7 @@ function Pin({ marker, px, active, dim, onEnter, onLeave, onPick }: PinProps) {
         </>
       )}
       {kind === 'impact' && (
-        // 着弾の跡。星形にして、観測員の丸とも標定の × とも取り違えないようにする
+        // 着弾の跡。星形にして、偵察兵の丸とも標定の × とも取り違えないようにする
         <path
           className="pin__burst"
           d={`M ${cx} ${cy - px(9)} L ${cx + px(2.6)} ${cy - px(2.6)} L ${cx + px(9)} ${cy} L ${cx + px(2.6)} ${cy + px(2.6)} L ${cx} ${cy + px(9)} L ${cx - px(2.6)} ${cy + px(2.6)} L ${cx - px(9)} ${cy} L ${cx - px(2.6)} ${cy - px(2.6)} Z`}
@@ -468,7 +468,7 @@ function Pin({ marker, px, active, dim, onEnter, onLeave, onPick }: PinProps) {
 
       {kind === 'known' &&
         (marker.lost === true ? (
-          // 撃破された観測員。中を抜いて×を重ね、残っている観測員と見分ける
+          // 撃破された偵察兵。中を抜いて×を重ね、残っている偵察兵と見分ける
           <>
             <circle className="pin__gone" cx={cx} cy={cy} r={px(7)} />
             <path

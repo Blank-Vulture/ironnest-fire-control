@@ -1,5 +1,5 @@
 /**
- * 三角測量。観測員の報告から目標の位置を割り出す。
+ * 三角測量。偵察兵の報告から目標の位置を割り出す。
  *
  * ゲーム側でも想定された手順で、方位どうし・距離どうし・方位と距離の
  * どの組み合わせでも成立する（Iron Nest Wiki / Map Measurements）。
@@ -22,11 +22,11 @@ import {
 export interface Observation {
   id: string
   label: string
-  /** 観測員の位置。 */
+  /** 偵察兵の位置。 */
   position: Point
-  /** 観測員から見た目標の方位（度）。無ければ null。 */
+  /** 偵察兵から見た目標の方位（度）。無ければ null。 */
   bearingDeg: number | null
-  /** 観測員から目標までの距離（km）。無ければ null。 */
+  /** 偵察兵から目標までの距離（km）。無ければ null。 */
   rangeKm: number | null
 }
 
@@ -92,7 +92,7 @@ function countConstraints(observations: readonly Observation[]): number {
  *
  * 方位は「その方位線からどれだけ横にずれているか」で測る。距離と同じ km で
  * 揃えておくと、方位と距離が混ざっていても素直に足し合わせられる。
- * 観測員の背後にある点は、方位線上に乗っていても誤りなので大きく罰する。
+ * 偵察兵の背後にある点は、方位線上に乗っていても誤りなので大きく罰する。
  */
 function residual(observation: Observation, point: Point): number {
   const { position, bearingDeg, rangeKm } = observation
@@ -142,7 +142,7 @@ function rayRay(a: Observation, b: Observation): Point[] {
   const dx = b.position.x - a.position.x
   const dy = b.position.y - a.position.y
   const t = (dx * by - dy * bx) / denominator
-  // 方位は向きを持つので、観測員の背後に出た交点は捨てる
+  // 方位は向きを持つので、偵察兵の背後に出た交点は捨てる
   if (t < 0) return []
 
   const point = raySegmentPoint(a, t)
@@ -200,7 +200,7 @@ function circleCircle(a: Observation, b: Observation): Point[] {
 function candidates(observations: readonly Observation[]): Point[] {
   const points: Point[] = []
 
-  // 方位と距離が両方そろった観測員は、それだけで 1 点に決まる
+  // 方位と距離が両方そろった偵察兵は、それだけで 1 点に決まる
   for (const o of observations) {
     if (o.bearingDeg !== null && o.rangeKm !== null) {
       points.push(pointFrom(o.position, o.bearingDeg, o.rangeKm))

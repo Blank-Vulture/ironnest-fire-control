@@ -76,7 +76,7 @@ describe('標定の網', () => {
 
   it('距離 3 つの重なる地点を出し、そこからさらに標定できる', () => {
     // 任務の例: 3 人の距離が重なる地点を基準点にして、
-    // その基準点からの方位と、観測員 3 からの方位で目標を割り出す
+    // その基準点からの方位と、偵察兵 3 からの方位で目標を割り出す
     const ref = 'H5 0:0'
     const target = 'J3 0:0'
     const doc: SurveyDoc = {
@@ -272,12 +272,12 @@ describe('観測元に選べる点', () => {
 })
 
 describe('標定の役割', () => {
-  it('観測基準点の印が無い標定は、観測元に出さない', () => {
+  it('観測基準点の印が無い標定も、観測元に出る', () => {
     const doc: SurveyDoc = {
       known: [known('sp1', 'I9 9:1')],
       fixes: [fix('ref', [], { isReference: false }), fix('t', [])],
     }
-    expect(availableSources(doc, 't').map((p) => p.id)).toEqual(['sp1'])
+    expect(availableSources(doc, 't').map((p) => p.id)).toEqual(['sp1', 'ref'])
   })
 
   it('攻撃対象と観測基準点は独立に持てる', () => {
@@ -473,7 +473,7 @@ describe('片づけに巻き込んでよいか', () => {
   })
 
   it('実測で確定した座標を持つ標定は残す', () => {
-    // 観測員を失えばもう作り直せない情報なので、消えたら終わり
+    // 偵察兵を失えばもう作り直せない情報なので、消えたら終わり
     const doc: SurveyDoc = { known: [], fixes: [fix('t', [], { pinnedGrid: 'H5 2:2' })] }
     expect(isFixDurable(doc, 't')).toBe(true)
   })

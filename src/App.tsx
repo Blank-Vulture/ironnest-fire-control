@@ -71,7 +71,7 @@ function loadSurvey(): SurveyDoc {
           (other) => other.id !== fix.id && other.sightings.some((s) => s.fromId === fix.id),
         ),
     }))
-    // 種別は後から足したので、古い保存には無い。砲座と補給隊以外は観測員だった。
+    // 種別は後から足したので、古い保存には無い。砲座と補給隊以外は偵察兵だった。
     const known = parsed.known.map((point) => ({
       ...point,
       kind:
@@ -192,7 +192,7 @@ export function App() {
     })
   }, [survey])
 
-  /** 標定から射撃順へ送る。送ったら射撃管制の画面に切り替える。 */
+  /** 標定から射撃順へ送る。 */
   const sendToFireControl = useCallback(
     (measurement: Measurement, origin?: TargetOrigin) => {
       setTargets((prev) => [
@@ -203,9 +203,8 @@ export function App() {
           candidate: origin?.candidate,
         },
       ])
-      go('fire')
     },
-    [go],
+    [],
   )
 
   const patch = useCallback(

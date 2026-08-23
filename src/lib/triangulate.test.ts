@@ -77,7 +77,7 @@ describe('三角測量', () => {
     expect(e.position.y).toBeCloseTo(target.y, 3)
   })
 
-  it('方位と距離を別々の観測員から混ぜられる', () => {
+  it('方位と距離を別々の偵察兵から混ぜられる', () => {
     // 「spotter1 から 3km」「spotter2 は方位 275 度」のような報告
     const e = solved(
       triangulate([report('1', s1, target, 'range'), report('2', s2, target, 'bearing')]),
@@ -109,7 +109,7 @@ describe('三角測量', () => {
     expect(triangulate([])).toEqual({ kind: 'insufficient', have: 0 })
   })
 
-  it('方位も距離も無い観測員は数えない', () => {
+  it('方位も距離も無い偵察兵は数えない', () => {
     const blank: Observation = { id: 'x', label: 'x', position: s3, bearingDeg: null, rangeKm: null }
     expect(triangulate([report('1', s1, target, 'bearing'), blank])).toEqual({
       kind: 'insufficient',
@@ -118,7 +118,7 @@ describe('三角測量', () => {
   })
 
   it('互いに背を向けた方位は矛盾として返す', () => {
-    // 方位線は向きを持つので、観測員の背後で交わっても解にしてはいけない
+    // 方位線は向きを持つので、偵察兵の背後で交わっても解にしてはいけない
     const wrong: Observation = {
       ...report('2', s2, target, 'bearing'),
       bearingDeg: (bearingBetween(s2, target) + 180) % 360,
