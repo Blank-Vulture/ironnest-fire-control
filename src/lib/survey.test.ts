@@ -3,6 +3,8 @@ import { bearingBetween, distanceBetween, formatPoint, gridToPoint, parseGrid } 
 import {
   NEST_FIX_ID,
   availableSources,
+  isFixDurable,
+  settledFixes,
   solveSurvey,
   trackedPoint,
   type Fix,
@@ -457,5 +459,58 @@ describe('カードが追いかける点', () => {
     const doc: SurveyDoc = { known: [], fixes: [fix('t', [])] }
     const unsolved = solveSurvey(doc).fixes[0]!
     expect(trackedPoint(unsolved, 1)).toBeNull()
+  })
+})
+
+describe('片づけに巻き込んでよいか', () => {
+  it('ただの標定は消してよい', () => {
+    const doc: SurveyDoc = { known: [], fixes: [fix('t', [])] }
+    expect(isFixDurable(doc, 't')).toBe(false)
+  })
+
+  it('実測で確定した座標を持つ標定は残す', () => {
+    // 観測員を失えばもう作り直せない情報なので、消えたら終わり
+    const doc: SurveyDoc = { known: [], fixes: [fix('t', [], { pinnedGrid: 'H5 2:2' })] }
+    expect(isFixDurable(doc, 't')).toBe(true)
+  })
+
+  it('読めない座標が入っているだけなら守らない', () => {
+    const doc: SurveyDoc = { known: [], fixes: [fix('t', [], { pinnedGrid: 'ZZ99' })] }
+    expect(isFixDurable(doc, 't')).toBe(false)
+  })
+
+  it('他の標定の観測元になっている標定は残す', () => {
+    const doc: SurveyDoc = {
+      known: [],
+      fixes: [fix('ref', []), fix('t', [sighting('ref', '90')])],
+    }
+    expect(isFixDurable(doc, 'ref')).toBe(true)
+    expect(isFixDurable(doc, 't')).toBe(false)
+  })
+
+  it('存在しない標定は守らない', () => {
+    expect(isFixDurable({ known: [], fixes: [] }, 'nope')).toBe(false)
+  })
+})
+
+describe('既知点として扱える標定', () => {
+  it('実測座標を持つものだけを拾う', () => {
+    const doc: SurveyDoc = {
+      known: [],
+      fixes: [
+        fix('a', [], { pinnedGrid: 'H5 2:2' }),
+        fix('b', []),
+        fix('c', [], { pinnedGrid: 'ZZ99' }),
+      ],
+    }
+    expect(settledFixes(doc).map((f) => f.id)).toEqual(['a'])
+  })
+
+  it('自機の現在地を割り出す標定は含めない', () => {
+    const doc: SurveyDoc = {
+      known: [],
+      fixes: [fix(NEST_FIX_ID, [], { pinnedGrid: 'H5 2:2' })],
+    }
+    expect(settledFixes(doc)).toEqual([])
   })
 })

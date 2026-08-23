@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ROUTES, ROUTE_TITLE, useHashRoute } from './lib/route'
 import { emptySurveyDoc, Plotting } from './pages/Plotting'
 import { FireControl } from './pages/FireControl'
-import { solveSurvey, trackedPoint, type Fix, type SurveyDoc } from './lib/survey'
+import {
+  isFixDurable,
+  solveSurvey,
+  trackedPoint,
+  type Fix,
+  type SurveyDoc,
+} from './lib/survey'
 import { firingSolutionFrom } from './lib/triangulate'
 import { formatPoint, pointFrom, type Point } from './lib/grid'
 import {
@@ -261,11 +267,9 @@ export function App() {
 
       const fixId = target?.originFixId
       if (fixId === undefined) return
-      const usedAsSource = doc.fixes.some(
-        (f) => f.id !== fixId && f.sightings.some((s) => s.fromId === fixId),
-      )
-      const otherCards = targets.some((t) => t.id !== id && t.originFixId === fixId)
-      if (usedAsSource || otherCards) return
+      // 実測で確定した座標や、他の標定が頼っている点は道連れにしない
+      if (isFixDurable(doc, fixId)) return
+      if (targets.some((t) => t.id !== id && t.originFixId === fixId)) return
       setDoc((prev) => ({ ...prev, fixes: prev.fixes.filter((f) => f.id !== fixId) }))
     },
     [targets, doc, remember],

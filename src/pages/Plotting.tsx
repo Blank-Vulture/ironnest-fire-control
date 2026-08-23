@@ -17,6 +17,7 @@ import { planConvoyRequest } from '../lib/convoy'
 import {
   NEST_FIX_ID,
   availableSources,
+  settledFixes,
   type SurveyResult,
   type Fix,
   type KnownPoint,
@@ -220,6 +221,8 @@ export function Plotting({
   const convoys = doc.known.filter((k) => nest !== undefined && k.parentId === nest.id)
   const spotters = doc.known.filter((k) => !k.isNest && k.parentId === undefined)
   const selfFix = survey.fixes.find((f) => f.fix.id === NEST_FIX_ID)
+  // 実測で座標が定まった標定は、もう推定ではなく既知点として扱える
+  const settled = settledFixes(doc)
   const targetFixes = survey.fixes.filter((f) => f.fix.id !== NEST_FIX_ID)
 
   /** 位置報告の要請を片付ける。補給隊とその標定を消す。 */
@@ -275,11 +278,13 @@ export function Plotting({
 
       <section className="known">
         <div className="known__head">
-          <h2 className="section__title">観測員</h2>
+          <h2 className="section__title">既知点</h2>
           <span className="section__hint">
             クリップボードの名簿（<code>Spotter1 - I9 9:1</code>）をどこかの欄に貼ると振り分けます
           </span>
         </div>
+
+        <h3 className="known__group">観測員</h3>
 
         <ol className="known__list">
           {spotters.map((point) => {
@@ -345,6 +350,51 @@ export function Plotting({
         >
           ＋ 観測員を追加
         </button>
+
+        {settled.length > 0 && (
+          <>
+            <h3 className="known__group">
+              確定した基準点
+              <span className="known__grouphint">
+                実測で確かめた座標。観測員を失っても作り直せないので、片づけに巻き込まれません
+              </span>
+            </h3>
+
+            <ol className="known__list">
+              {settled.map((point) => (
+                <li
+                  key={point.id}
+                  className="known__row is-settled"
+                  onMouseEnter={() => setHighlight(point.id)}
+                  onMouseLeave={() => setHighlight((h) => (h === point.id ? null : h))}
+                >
+                  <span className="known__mark" aria-hidden>
+                    ◈
+                  </span>
+                  <span className="known__fixed">{point.label}</span>
+                  <input
+                    className="known__grid"
+                    value={point.pinnedGrid ?? ''}
+                    onChange={(e) => patchFix(point.id, { pinnedGrid: e.target.value })}
+                    spellCheck={false}
+                    autoComplete="off"
+                    aria-label={`${point.label} の実測座標`}
+                  />
+                  <button
+                    className="known__release"
+                    onClick={() => {
+                      onRemember('実測座標を取り消し')
+                      patchFix(point.id, { pinnedGrid: undefined })
+                    }}
+                    title="実測を取り消して、三角測量の推定に戻す"
+                  >
+                    推定に戻す
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
 
         {pasteError.length > 0 && (
           <p className="section__error">

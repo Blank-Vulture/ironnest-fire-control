@@ -343,3 +343,28 @@ export function trackedPoint(resolved: ResolvedFix, candidate: 1 | 2 | undefined
   if (resolved.alternative === null) return resolved.status.position
   return candidate === 2 ? resolved.alternative : resolved.status.position
 }
+
+/**
+ * その標定を、片づけに巻き込んで消してよいか。
+ *
+ * 実測で確かめた座標は、観測員を失えばもう作り直せない。観測が再現できる
+ * うちは消しても取り戻せるが、確定した座標だけは別で、消えたら終わり。
+ * 他の標定の観測元になっているものも、消すと連鎖が切れる。
+ */
+export function isFixDurable(doc: SurveyDoc, fixId: PointId): boolean {
+  const fix = doc.fixes.find((f) => f.id === fixId)
+  if (fix === undefined) return false
+
+  const measured = fix.pinnedGrid !== undefined && parseGrid(fix.pinnedGrid) !== null
+  const usedAsSource = doc.fixes.some(
+    (other) => other.id !== fixId && other.sightings.some((s) => s.fromId === fixId),
+  )
+  return measured || usedAsSource
+}
+
+/** 座標が定まっていて、これ以上の観測を要しない標定。既知点として扱える。 */
+export function settledFixes(doc: SurveyDoc): Fix[] {
+  return doc.fixes.filter(
+    (f) => f.id !== NEST_FIX_ID && f.pinnedGrid !== undefined && parseGrid(f.pinnedGrid) !== null,
+  )
+}

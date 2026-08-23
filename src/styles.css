@@ -1320,6 +1320,60 @@ code {
   color: var(--accent);
 }
 
+/* 既知点の中の区分け */
+.known__group {
+  margin: 4px 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.known__grouphint {
+  letter-spacing: 0;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+/* 実測で確定した基準点 */
+.known__row.is-settled {
+  grid-template-columns: 18px minmax(80px, 1fr) 9em auto;
+  border-color: var(--accent-dim);
+}
+
+.known__row.is-settled .known__mark {
+  color: var(--accent);
+}
+
+.known__fixed {
+  font-size: 13px;
+  padding: 6px 9px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.known__release {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  padding: 5px 11px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.known__release:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 /* ---------- 観測員の生存 ---------- */
 
 .known__alive {
@@ -1517,6 +1571,60 @@ code {
 .tabs__undo:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* 既知点の中の区分け */
+.known__group {
+  margin: 4px 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.known__grouphint {
+  letter-spacing: 0;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+/* 実測で確定した基準点 */
+.known__row.is-settled {
+  grid-template-columns: 18px minmax(80px, 1fr) 9em auto;
+  border-color: var(--accent-dim);
+}
+
+.known__row.is-settled .known__mark {
+  color: var(--accent);
+}
+
+.known__fixed {
+  font-size: 13px;
+  padding: 6px 9px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.known__release {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  padding: 5px 11px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.known__release:hover {
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 /* ---------- 観測員の生存 ---------- */
@@ -2967,6 +3075,23 @@ code {
       'mark label remove'
       '.    grid  grid';
     row-gap: 5px;
+  }
+
+  .known__row.is-settled {
+    grid-template-columns: 18px 1fr;
+    grid-template-areas:
+      'mark label'
+      '.    grid'
+      '.    release';
+  }
+
+  .known__fixed {
+    grid-area: label;
+  }
+
+  .known__release {
+    grid-area: release;
+    justify-self: start;
   }
 
   /* 補給隊の欄も横に 4 つ並ばないので、名前と要請先を上の段に出す */
