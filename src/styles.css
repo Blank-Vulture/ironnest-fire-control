@@ -1004,6 +1004,20 @@ code {
   gap: 8px;
 }
 
+.known__columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(10px, 2vw, 20px);
+  align-items: start;
+}
+
+.known__col {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
 .known__list {
   list-style: none;
   margin: 0;
@@ -1015,13 +1029,15 @@ code {
 
 .known__row {
   display: grid;
-  grid-template-columns: 18px minmax(80px, 1fr) 9em 28px;
-  gap: 8px;
+  /* 列が半分になったぶん、名前は詰めて座標に幅を渡す */
+  grid-template-columns: 16px minmax(48px, 1fr) 7.2em 24px;
+  gap: 6px;
   align-items: center;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 6px 10px;
+  padding: 6px 8px;
+  min-width: 0;
 }
 
 .known__mark {
@@ -1035,15 +1051,19 @@ code {
   background: var(--panel-2);
   border: 1px solid transparent;
   border-radius: 6px;
-  padding: 6px 9px;
+  padding: 6px 7px;
   min-width: 0;
   outline: none;
   transition: border-color 120ms ease;
 }
 
+.known__label {
+  font-size: 12px;
+}
+
 .known__grid {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .known__label:focus,
@@ -1359,7 +1379,6 @@ code {
 
 /* 実測で確定した基準点 */
 .known__row.is-settled {
-  grid-template-columns: 18px minmax(80px, 1fr) 9em auto;
   border-color: var(--accent-dim);
 }
 
@@ -1368,28 +1387,38 @@ code {
 }
 
 .known__fixed {
-  font-size: 13px;
-  padding: 6px 9px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 7px;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.known__from {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  border-radius: 3px;
+  padding: 0 4px;
+  flex: none;
 }
 
 .known__release {
   background: none;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  border: none;
+  border-radius: 4px;
   color: var(--muted);
-  padding: 5px 11px;
-  font-size: 11px;
+  padding: 4px;
+  font-size: 13px;
+  line-height: 1;
   cursor: pointer;
-  white-space: nowrap;
 }
 
 .known__release:hover {
-  border-color: var(--danger);
-  color: var(--danger);
+  color: var(--accent);
+  background: var(--panel-2);
 }
 
 /* ---------- 観測員の生存 ---------- */
@@ -1612,7 +1641,6 @@ code {
 
 /* 実測で確定した基準点 */
 .known__row.is-settled {
-  grid-template-columns: 18px minmax(80px, 1fr) 9em auto;
   border-color: var(--accent-dim);
 }
 
@@ -1621,28 +1649,38 @@ code {
 }
 
 .known__fixed {
-  font-size: 13px;
-  padding: 6px 9px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 7px;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.known__from {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  border-radius: 3px;
+  padding: 0 4px;
+  flex: none;
 }
 
 .known__release {
   background: none;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  border: none;
+  border-radius: 4px;
   color: var(--muted);
-  padding: 5px 11px;
-  font-size: 11px;
+  padding: 4px;
+  font-size: 13px;
+  line-height: 1;
   cursor: pointer;
-  white-space: nowrap;
 }
 
 .known__release:hover {
-  border-color: var(--danger);
-  color: var(--danger);
+  color: var(--accent);
+  background: var(--panel-2);
 }
 
 /* ---------- 観測員の生存 ---------- */
@@ -3087,20 +3125,18 @@ code {
     justify-self: end;
   }
 
+  /* 半分の幅では 4 つ並ばないので、縦に積む */
+  .known__columns {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
   .known__row {
-    grid-template-columns: 18px 1fr 28px;
+    grid-template-columns: 16px 1fr 24px;
     grid-template-areas:
       'mark label remove'
       '.    grid  grid';
     row-gap: 5px;
-  }
-
-  .known__row.is-settled {
-    grid-template-columns: 18px 1fr;
-    grid-template-areas:
-      'mark label'
-      '.    grid'
-      '.    release';
   }
 
   .known__fixed {
@@ -3108,8 +3144,7 @@ code {
   }
 
   .known__release {
-    grid-area: release;
-    justify-self: start;
+    grid-area: remove;
   }
 
   /* 補給隊の欄も横に 4 つ並ばないので、名前と要請先を上の段に出す */

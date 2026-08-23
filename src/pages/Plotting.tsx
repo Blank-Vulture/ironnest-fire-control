@@ -46,7 +46,17 @@ const id = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 
 export function newKnownPoint(index: number): KnownPoint {
-  return { id: id('k'), label: `観測員 ${index}`, gridInput: '', isNest: false }
+  return { id: id('k'), label: `観測員 ${index}`, gridInput: '', isNest: false, kind: 'spotter' }
+}
+
+export function newReferencePoint(index: number): KnownPoint {
+  return {
+    id: id('k'),
+    label: `基準点 ${'ABCDE'[index] ?? index + 1}`,
+    gridInput: '',
+    isNest: false,
+    kind: 'reference',
+  }
 }
 
 export function newSighting(): Sighting {
@@ -131,7 +141,10 @@ export function Plotting({
           label: entry.label || `観測員 ${i + 1}`,
           gridInput: formatEntryGrid(entry.grid),
           isNest: false,
+          kind: 'spotter' as const,
         })),
+        // 基準点と補給隊は名簿に載らないので、貼り付けで消さない
+        ...doc.known.filter((k) => k.kind === 'reference' || k.parentId !== undefined),
       ],
     })
     setPasteError(bad)
@@ -219,7 +232,9 @@ export function Plotting({
   // 補給隊もその流れの一部なので、既知点の一覧には並べない。
   const nest = doc.known.find((k) => k.isNest)
   const convoys = doc.known.filter((k) => nest !== undefined && k.parentId === nest.id)
-  const spotters = doc.known.filter((k) => !k.isNest && k.parentId === undefined)
+  const loose = doc.known.filter((k) => !k.isNest && k.parentId === undefined)
+  const spotters = loose.filter((k) => k.kind !== 'reference')
+  const references = loose.filter((k) => k.kind === 'reference')
   const selfFix = survey.fixes.find((f) => f.fix.id === NEST_FIX_ID)
   // 実測で座標が定まった標定は、もう推定ではなく既知点として扱える
   const settled = settledFixes(doc)
@@ -284,83 +299,129 @@ export function Plotting({
           </span>
         </div>
 
-        <h3 className="known__group">観測員</h3>
+        {/* 報告を寄こす側と、位置だけが分かっている側。役割が違うので列を分ける */}
+        <div className="known__columns">
+          <div className="known__col">
+            <h3 className="known__group">観測員</h3>
 
-        <ol className="known__list">
-          {spotters.map((point) => {
-            const bad = point.gridInput !== '' && parseGrid(point.gridInput) === null
-            return (
-              <li
-                key={point.id}
-                className={`known__row${point.lost === true ? ' is-lost' : ''}`}
-                onMouseEnter={() => setHighlight(point.id)}
-                onMouseLeave={() => setHighlight((h) => (h === point.id ? null : h))}
-              >
-                <button
-                  className={`known__alive${point.lost === true ? ' is-lost' : ''}`}
-                  onClick={() => patchKnown(point.id, { lost: point.lost !== true })}
-                  title={
-                    point.lost === true
-                      ? '撃破された扱い。押すと健在に戻します'
-                      : '健在。押すと撃破された扱いにします'
-                  }
-                  aria-pressed={point.lost === true}
-                >
-                  {point.lost === true ? '✕' : '○'}
-                </button>
-                <input
-                  className="known__label"
-                  value={point.label}
-                  onChange={(e) => patchKnown(point.id, { label: e.target.value })}
-                  spellCheck={false}
-                  aria-label="点の名前"
-                />
-                <input
-                  className={`known__grid${bad ? ' is-invalid' : ''}`}
-                  value={point.gridInput}
-                  onChange={(e) => patchKnown(point.id, { gridInput: e.target.value })}
-                  onPaste={handlePaste}
-                  placeholder="I9 9:1"
-                  spellCheck={false}
-                  autoComplete="off"
-                  aria-label="グリッド座標"
-                  aria-invalid={bad}
-                />
-                <button
-                  className="known__remove"
-                  onClick={() => {
-                    onRemember('観測員を削除')
-                    onChange({ ...doc, known: doc.known.filter((k) => k.id !== point.id) })
-                  }}
-                  title="削除"
-                  aria-label={`${point.label} を削除`}
-                >
-                  ✕
-                </button>
-              </li>
-            )
-          })}
-        </ol>
+            <ol className="known__list">
+              {spotters.map((point) => {
+                const bad = point.gridInput !== '' && parseGrid(point.gridInput) === null
+                return (
+                  <li
+                    key={point.id}
+                    className={`known__row${point.lost === true ? ' is-lost' : ''}`}
+                    onMouseEnter={() => setHighlight(point.id)}
+                    onMouseLeave={() => setHighlight((h) => (h === point.id ? null : h))}
+                  >
+                    <button
+                      className={`known__alive${point.lost === true ? ' is-lost' : ''}`}
+                      onClick={() => patchKnown(point.id, { lost: point.lost !== true })}
+                      title={
+                        point.lost === true
+                          ? '撃破された扱い。押すと健在に戻します'
+                          : '健在。押すと撃破された扱いにします'
+                      }
+                      aria-pressed={point.lost === true}
+                    >
+                      {point.lost === true ? '✕' : '○'}
+                    </button>
+                    <input
+                      className="known__label"
+                      value={point.label}
+                      onChange={(e) => patchKnown(point.id, { label: e.target.value })}
+                      spellCheck={false}
+                      aria-label="観測員の名前"
+                    />
+                    <input
+                      className={`known__grid${bad ? ' is-invalid' : ''}`}
+                      value={point.gridInput}
+                      onChange={(e) => patchKnown(point.id, { gridInput: e.target.value })}
+                      onPaste={handlePaste}
+                      placeholder="I9 9:1"
+                      spellCheck={false}
+                      autoComplete="off"
+                      aria-label="グリッド座標"
+                      aria-invalid={bad}
+                    />
+                    <button
+                      className="known__remove"
+                      onClick={() => {
+                        onRemember('観測員を削除')
+                        onChange({ ...doc, known: doc.known.filter((k) => k.id !== point.id) })
+                      }}
+                      title="削除"
+                      aria-label={`${point.label} を削除`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                )
+              })}
+            </ol>
 
-        <button
-          className="section__add"
-          onClick={() =>
-            onChange({ ...doc, known: [...doc.known, newKnownPoint(spotters.length + 1)] })
-          }
-        >
-          ＋ 観測員を追加
-        </button>
+            <button
+              className="section__add"
+              onClick={() =>
+                onChange({ ...doc, known: [...doc.known, newKnownPoint(spotters.length + 1)] })
+              }
+            >
+              ＋ 観測員
+            </button>
+          </div>
 
-        {settled.length > 0 && (
-          <>
+          <div className="known__col">
             <h3 className="known__group">
-              確定した基準点
-              <span className="known__grouphint">
-                実測で確かめた座標。観測員を失っても作り直せないので、片づけに巻き込まれません
-              </span>
+              基準点
+              <span className="known__grouphint">座標が分かっている点。観測元にも使えます</span>
             </h3>
 
             <ol className="known__list">
+              {references.map((point) => {
+                const bad = point.gridInput !== '' && parseGrid(point.gridInput) === null
+                return (
+                  <li
+                    key={point.id}
+                    className="known__row"
+                    onMouseEnter={() => setHighlight(point.id)}
+                    onMouseLeave={() => setHighlight((h) => (h === point.id ? null : h))}
+                  >
+                    <span className="known__mark" aria-hidden>
+                      ◈
+                    </span>
+                    <input
+                      className="known__label"
+                      value={point.label}
+                      onChange={(e) => patchKnown(point.id, { label: e.target.value })}
+                      spellCheck={false}
+                      aria-label="基準点の名前"
+                    />
+                    <input
+                      className={`known__grid${bad ? ' is-invalid' : ''}`}
+                      value={point.gridInput}
+                      onChange={(e) => patchKnown(point.id, { gridInput: e.target.value })}
+                      placeholder="F4 2:3"
+                      spellCheck={false}
+                      autoComplete="off"
+                      aria-label="グリッド座標"
+                      aria-invalid={bad}
+                    />
+                    <button
+                      className="known__remove"
+                      onClick={() => {
+                        onRemember('基準点を削除')
+                        onChange({ ...doc, known: doc.known.filter((k) => k.id !== point.id) })
+                      }}
+                      title="削除"
+                      aria-label={`${point.label} を削除`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                )
+              })}
+
+              {/* 撃って確かめた標定も、由来が違うだけで同じ基準点 */}
               {settled.map((point) => (
                 <li
                   key={point.id}
@@ -371,7 +432,10 @@ export function Plotting({
                   <span className="known__mark" aria-hidden>
                     ◈
                   </span>
-                  <span className="known__fixed">{point.label}</span>
+                  <span className="known__fixed">
+                    {point.label}
+                    <span className="known__from">実測</span>
+                  </span>
                   <input
                     className="known__grid"
                     value={point.pinnedGrid ?? ''}
@@ -387,14 +451,27 @@ export function Plotting({
                       patchFix(point.id, { pinnedGrid: undefined })
                     }}
                     title="実測を取り消して、三角測量の推定に戻す"
+                    aria-label={`${point.label} を推定に戻す`}
                   >
-                    推定に戻す
+                    ↺
                   </button>
                 </li>
               ))}
             </ol>
-          </>
-        )}
+
+            <button
+              className="section__add"
+              onClick={() =>
+                onChange({
+                  ...doc,
+                  known: [...doc.known, newReferencePoint(references.length)],
+                })
+              }
+            >
+              ＋ 基準点
+            </button>
+          </div>
+        </div>
 
         {pasteError.length > 0 && (
           <p className="section__error">

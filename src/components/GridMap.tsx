@@ -34,6 +34,9 @@ const FRIENDLY_LIGHTNESS = [70, 58, 46, 78, 52] as const
 const HOSTILE = 'hsl(6 74% 60%)'
 const HOSTILE_DIM = 'hsl(6 44% 48%)'
 
+/** 基準点。ゲーム内の A〜E トークンに合わせて緑。 */
+const REFERENCE = 'hsl(142 52% 55%)'
+
 function friendlyColor(index: number): string {
   return `hsl(${FRIENDLY_HUE} 72% ${FRIENDLY_LIGHTNESS[index % FRIENDLY_LIGHTNESS.length]!}%)`
 }
@@ -118,12 +121,16 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
    * 観測元の色。自機は黄、観測員は青の濃淡、標定した点は赤。
    * その点から引いた円や線も同じ色になるので、どこからの報告か辿れる。
    */
-  const spotters = doc.known.filter((k) => !k.isNest)
+  const spotters = doc.known.filter((k) => !k.isNest && k.kind !== 'reference')
   const colorOf = (id: string): string => {
-    const nest = doc.known.find((k) => k.id === id && k.isNest)
-    if (nest !== undefined) return 'var(--accent)'
+    const point = doc.known.find((k) => k.id === id)
+    if (point?.isNest === true) return 'var(--accent)'
+    if (point?.kind === 'reference') return REFERENCE
     const spotterIndex = spotters.findIndex((k) => k.id === id)
     if (spotterIndex >= 0) return friendlyColor(spotterIndex)
+    // 撃って確かめた標定は、もう推定ではなく基準点として働いている
+    const fix = doc.fixes.find((f) => f.id === id)
+    if (fix?.isReference === true && fix.pinnedGrid !== undefined) return REFERENCE
     return HOSTILE
   }
 
@@ -179,7 +186,7 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
       kind: 'fix',
       name: ambiguous ? `${resolved.fix.label}（候補地 1）` : resolved.fix.label,
       at: resolved.status.position,
-      color: self ? 'var(--accent)' : HOSTILE,
+      color: self ? 'var(--accent)' : colorOf(resolved.fix.id),
       struck: struck(resolved.fix.id),
     })
     if (resolved.alternative !== null) {

@@ -28,11 +28,21 @@ export type PointId = string
  */
 export const NEST_FIX_ID = 'nest-position'
 
-/** 位置がグリッドで分かっている点。観測員や砲座。 */
+/**
+ * 位置がグリッドで分かっている点。
+ *
+ * 報告を寄こす観測員と、位置だけが分かっている基準点は役割が違う。
+ * 基準点は High Command から座標をそのまま渡されることがあるので、
+ * 三角測量を経ずに置ける。
+ */
+export type KnownKind = 'spotter' | 'reference'
+
 export interface KnownPoint {
   id: PointId
   label: string
   gridInput: string
+  /** 観測員か基準点か。砲座と補給隊はこの区別を持たない。 */
+  kind?: KnownKind
   /** 砲座。射撃諸元の基準になるので 1 つだけ。 */
   isNest: boolean
   /** 別の点にぶら下げて見せるとき、その親。補給隊を IRON NEST の下に置く。 */

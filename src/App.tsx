@@ -69,7 +69,16 @@ function loadSurvey(): SurveyDoc {
           (other) => other.id !== fix.id && other.sightings.some((s) => s.fromId === fix.id),
         ),
     }))
-    return { known: parsed.known, fixes }
+    // 種別は後から足したので、古い保存には無い。砲座と補給隊以外は観測員だった。
+    const known = parsed.known.map((point) => ({
+      ...point,
+      kind:
+        point.kind ??
+        (point.isNest || point.parentId !== undefined
+          ? undefined
+          : ('spotter' as const)),
+    }))
+    return { known, fixes }
   } catch {
     return emptySurveyDoc()
   }
