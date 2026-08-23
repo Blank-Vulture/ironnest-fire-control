@@ -3,7 +3,11 @@ import { bearingBetween, distanceBetween, formatPoint, gridToPoint, parseGrid } 
 import {
   NEST_FIX_ID,
   availableSources,
+  isAutoLabel,
   isFixDurable,
+  labelForRole,
+  nextReferenceLabel,
+  nextTargetLabel,
   settledFixes,
   solveSurvey,
   trackedPoint,
@@ -512,5 +516,75 @@ describe('既知点として扱える標定', () => {
       fixes: [fix(NEST_FIX_ID, [], { pinnedGrid: 'H5 2:2' })],
     }
     expect(settledFixes(doc)).toEqual([])
+  })
+})
+
+describe('名前の自動付与', () => {
+  const doc = (labels: { known?: string[]; fixes?: string[] }): SurveyDoc => ({
+    known: (labels.known ?? []).map((label, i) => ({
+      id: `k${i}`,
+      label,
+      gridInput: '',
+      isNest: false,
+      kind: 'reference' as const,
+    })),
+    fixes: (labels.fixes ?? []).map((label, i) => ({ ...fix(`f${i}`, []), label })),
+  })
+
+  it('自動で付けた名前だけを対象にする', () => {
+    expect(isAutoLabel('目標 1')).toBe(true)
+    expect(isAutoLabel('基準点 A')).toBe(true)
+    expect(isAutoLabel('基準点 27')).toBe(true)
+    expect(isAutoLabel('橋のたもと')).toBe(false)
+    expect(isAutoLabel('目標 1 の北')).toBe(false)
+    expect(isAutoLabel('Spotter1')).toBe(false)
+  })
+
+  it('基準点は英字で順に振る', () => {
+    expect(nextReferenceLabel(doc({}))).toBe('基準点 A')
+    expect(nextReferenceLabel(doc({ fixes: ['基準点 A'] }))).toBe('基準点 B')
+    expect(nextReferenceLabel(doc({ fixes: ['基準点 A', '基準点 B'] }))).toBe('基準点 C')
+  })
+
+  it('直接置いた基準点と番号を取り合わない', () => {
+    // ＋基準点 で置いたものと、標定に印を付けたものは同じ並びを共有する
+    expect(nextReferenceLabel(doc({ known: ['基準点 A'], fixes: ['基準点 B'] }))).toBe('基準点 C')
+  })
+
+  it('間が空いていればそこを埋める', () => {
+    expect(nextReferenceLabel(doc({ fixes: ['基準点 A', '基準点 C'] }))).toBe('基準点 B')
+  })
+
+  it('英字を使い切ったら番号に移る', () => {
+    const all = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((c) => `基準点 ${c}`)
+    expect(nextReferenceLabel(doc({ fixes: all }))).toBe('基準点 27')
+  })
+
+  it('目標は番号で順に振る', () => {
+    expect(nextTargetLabel(doc({}))).toBe('目標 1')
+    expect(nextTargetLabel(doc({ fixes: ['目標 1', '目標 2'] }))).toBe('目標 3')
+    expect(nextTargetLabel(doc({ fixes: ['目標 1', '目標 3'] }))).toBe('目標 2')
+  })
+
+  it('観測基準点に印を付けると基準点の名前になる', () => {
+    const d = doc({ fixes: ['目標 1', '目標 2'] })
+    expect(labelForRole(d, d.fixes[1]!, true)).toBe('基準点 A')
+  })
+
+  it('印を外すと目標の名前に戻る', () => {
+    const d = doc({ fixes: ['目標 1', '基準点 A'] })
+    expect(labelForRole(d, d.fixes[1]!, false)).toBe('目標 2')
+  })
+
+  it('手で付けた名前は書き換えない', () => {
+    const d = doc({ fixes: ['橋のたもと'] })
+    expect(labelForRole(d, d.fixes[0]!, true)).toBe('橋のたもと')
+    expect(labelForRole(d, d.fixes[0]!, false)).toBe('橋のたもと')
+  })
+
+  it('自分自身の名前は空きとして扱う', () => {
+    // 基準点 A のまま印を外して付け直しても、A に戻れる
+    const d = doc({ fixes: ['基準点 A'] })
+    expect(nextReferenceLabel(d, 'f0')).toBe('基準点 A')
   })
 })

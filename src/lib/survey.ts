@@ -378,3 +378,77 @@ export function settledFixes(doc: SurveyDoc): Fix[] {
     (f) => f.id !== NEST_FIX_ID && f.pinnedGrid !== undefined && parseGrid(f.pinnedGrid) !== null,
   )
 }
+
+/* ---------- 名前の自動付与 ---------- */
+
+const AUTO_TARGET = /^目標\s*(\d+)$/
+const AUTO_REFERENCE = /^基準点\s*([A-Z]|\d+)$/
+
+/**
+ * 自動で付けた名前か。
+ *
+ * 役割を切り替えたときに名前も付け替えるが、手で付けた名前まで
+ * 書き換えてしまうと、呼び慣れた名前が消えて困る。自動で付けたものだけを
+ * 対象にする。
+ */
+export function isAutoLabel(label: string): boolean {
+  const trimmed = label.trim()
+  return AUTO_TARGET.test(trimmed) || AUTO_REFERENCE.test(trimmed)
+}
+
+/** いま使われている名前。直接置いた基準点と標定の両方から集める。 */
+function usedLabels(doc: SurveyDoc, exceptId?: PointId): Set<string> {
+  const labels = new Set<string>()
+  for (const point of doc.known) {
+    if (point.id !== exceptId) labels.add(point.label.trim())
+  }
+  for (const fix of doc.fixes) {
+    if (fix.id !== exceptId) labels.add(fix.label.trim())
+  }
+  return labels
+}
+
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+/**
+ * まだ使われていない基準点の名前。
+ *
+ * ゲーム内の基準点トークンが A〜E なので、こちらも英字で振る。
+ * 直接置いた基準点と、観測基準点に印を付けた標定は同じ並びを共有するので、
+ * 番号が重ならないよう両方を見る。
+ */
+export function nextReferenceLabel(doc: SurveyDoc, exceptId?: PointId): string {
+  const used = usedLabels(doc, exceptId)
+  for (const letter of LETTERS) {
+    const candidate = `基準点 ${letter}`
+    if (!used.has(candidate)) return candidate
+  }
+  for (let n = 1; ; n++) {
+    const candidate = `基準点 ${LETTERS.length + n}`
+    if (!used.has(candidate)) return candidate
+  }
+}
+
+/** まだ使われていない目標の名前。 */
+export function nextTargetLabel(doc: SurveyDoc, exceptId?: PointId): string {
+  const used = usedLabels(doc, exceptId)
+  for (let n = 1; ; n++) {
+    const candidate = `目標 ${n}`
+    if (!used.has(candidate)) return candidate
+  }
+}
+
+/**
+ * 役割を切り替えたときの名前。
+ * 自動で付けた名前のときだけ、新しい役割に合った名前へ振り直す。
+ */
+export function labelForRole(
+  doc: SurveyDoc,
+  fix: Fix,
+  becomingReference: boolean,
+): string {
+  if (!isAutoLabel(fix.label)) return fix.label
+  return becomingReference
+    ? nextReferenceLabel(doc, fix.id)
+    : nextTargetLabel(doc, fix.id)
+}

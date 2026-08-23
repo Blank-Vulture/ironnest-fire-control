@@ -17,6 +17,9 @@ import { planConvoyRequest } from '../lib/convoy'
 import {
   NEST_FIX_ID,
   availableSources,
+  labelForRole,
+  nextReferenceLabel,
+  nextTargetLabel,
   settledFixes,
   type SurveyResult,
   type Fix,
@@ -49,10 +52,10 @@ export function newKnownPoint(index: number): KnownPoint {
   return { id: id('k'), label: `観測員 ${index}`, gridInput: '', isNest: false, kind: 'spotter' }
 }
 
-export function newReferencePoint(index: number): KnownPoint {
+export function newReferencePoint(doc: SurveyDoc): KnownPoint {
   return {
     id: id('k'),
-    label: `基準点 ${'ABCDE'[index] ?? index + 1}`,
+    label: nextReferenceLabel(doc),
     gridInput: '',
     isNest: false,
     kind: 'reference',
@@ -63,10 +66,10 @@ export function newSighting(): Sighting {
   return { id: id('s'), fromId: '', bearingInput: '', rangeInput: '' }
 }
 
-export function newFix(index: number): Fix {
+export function newFix(doc: SurveyDoc): Fix {
   return {
     id: id('f'),
-    label: `目標 ${index}`,
+    label: nextTargetLabel(doc),
     sightings: [newSighting(), newSighting()],
     isReference: false,
     // 撃つために作ることがほとんどなので、攻撃対象は既定でオン
@@ -77,7 +80,7 @@ export function newFix(index: number): Fix {
 export const NEST_LABEL = 'IRON NEST'
 
 export function emptySurveyDoc(): SurveyDoc {
-  return {
+  const doc: SurveyDoc = {
     known: [
       { id: id('k'), label: NEST_LABEL, gridInput: '', isNest: true },
       // 観測員は基本 3 人つく
@@ -85,8 +88,9 @@ export function emptySurveyDoc(): SurveyDoc {
       newKnownPoint(2),
       newKnownPoint(3),
     ],
-    fixes: [newFix(1)],
+    fixes: [],
   }
+  return { ...doc, fixes: [newFix(doc)] }
 }
 
 /**
@@ -464,7 +468,7 @@ export function Plotting({
               onClick={() =>
                 onChange({
                   ...doc,
-                  known: [...doc.known, newReferencePoint(references.length)],
+                  known: [...doc.known, newReferencePoint(doc)],
                 })
               }
             >
@@ -515,9 +519,14 @@ export function Plotting({
               }
               onRemove={() => onRemoveFix(resolved.fix.id)}
               onAddTarget={onAddTarget}
-              onToggleReference={() =>
-                patchFix(resolved.fix.id, { isReference: !resolved.fix.isReference })
-              }
+              onToggleReference={() => {
+                // 役割が変われば呼び名も変わる。手で付けた名前はそのまま残す
+                const becoming = !resolved.fix.isReference
+                patchFix(resolved.fix.id, {
+                  isReference: becoming,
+                  label: labelForRole(doc, resolved.fix, becoming),
+                })
+              }}
               onToggleTarget={() =>
                 patchFix(resolved.fix.id, { isTarget: !resolved.fix.isTarget })
               }
@@ -529,7 +538,7 @@ export function Plotting({
 
         <button
           className="section__add"
-          onClick={() => onChange({ ...doc, fixes: [...doc.fixes, newFix(doc.fixes.length + 1)] })}
+          onClick={() => onChange({ ...doc, fixes: [...doc.fixes, newFix(doc)] })}
         >
           ＋ 標定を追加
         </button>
