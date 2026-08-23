@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FiringPlan } from './components/FiringPlan'
+import { Survey, emptySurvey, type SurveyState } from './components/Survey'
 import { TargetIntake } from './components/TargetIntake'
 import { isShellCode } from './lib/shells'
 import {
@@ -12,6 +13,7 @@ import {
 } from './lib/targets'
 
 const STORAGE_KEY = 'iron-nest-timing/v4'
+const SURVEY_KEY = 'iron-nest-timing/survey/v1'
 
 function load(): Target[] {
   try {
@@ -33,8 +35,32 @@ function load(): Target[] {
   }
 }
 
+function loadSurvey(): SurveyState {
+  try {
+    const raw = localStorage.getItem(SURVEY_KEY)
+    if (!raw) return emptySurvey()
+    const parsed = JSON.parse(raw) as Partial<SurveyState>
+    if (!Array.isArray(parsed.spotters) || parsed.spotters.length === 0) return emptySurvey()
+    return {
+      open: parsed.open === true,
+      nestGrid: typeof parsed.nestGrid === 'string' ? parsed.nestGrid : '',
+      spotters: parsed.spotters.filter(
+        (s) =>
+          typeof s?.id === 'string' &&
+          typeof s?.label === 'string' &&
+          typeof s?.gridInput === 'string' &&
+          typeof s?.bearingInput === 'string' &&
+          typeof s?.rangeInput === 'string',
+      ),
+    }
+  } catch {
+    return emptySurvey()
+  }
+}
+
 export function App() {
   const [targets, setTargets] = useState<Target[]>(load)
+  const [survey, setSurvey] = useState<SurveyState>(loadSurvey)
 
   useEffect(() => {
     try {
@@ -43,6 +69,14 @@ export function App() {
       // プライベートモード等で書けなくても動作自体は続ける
     }
   }, [targets])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SURVEY_KEY, JSON.stringify(survey))
+    } catch {
+      // 書けなくても動作自体は続ける
+    }
+  }, [survey])
 
   const plan = useMemo(() => buildPlan(targets), [targets])
 
@@ -74,6 +108,8 @@ export function App() {
         </h1>
         <p className="topbar__sub">方位角 / 射程 → 仰角 · 装薬 · 飛翔時間 · 発射時刻</p>
       </header>
+
+      <Survey state={survey} onChange={setSurvey} onAdd={(m) => add([m])} />
 
       <TargetIntake onAdd={add} />
 

@@ -107,6 +107,256 @@ code {
   letter-spacing: 0.02em;
 }
 
+/* ---------- 目標の推定（三角測量） ---------- */
+
+.survey {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.survey.is-open {
+  border-color: var(--accent-dim);
+}
+
+.survey__toggle {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 11px 16px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+.survey__caret {
+  font-size: 10px;
+}
+
+.survey__summary {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--muted);
+  text-align: right;
+}
+
+.survey__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 16px 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.survey__hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.survey__k {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.survey__nest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.survey__nest input {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: var(--mono);
+  font-size: 15px;
+  width: 8em;
+  outline: none;
+}
+
+.survey__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.spotter {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) 7em 5.5em 5.5em 28px;
+  gap: 7px;
+  align-items: center;
+}
+
+.spotter--header {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.spotter input {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+  min-width: 0;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.spotter__grid,
+.spotter__num {
+  font-family: var(--mono);
+}
+
+.spotter__num {
+  text-align: right;
+}
+
+.spotter input:focus {
+  border-color: var(--accent);
+}
+
+.spotter input.is-invalid,
+.survey__nest input.is-invalid {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.spotter input::placeholder {
+  color: #4a5361;
+}
+
+.spotter__remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.spotter__remove:hover:not(:disabled) {
+  color: var(--danger);
+  background: var(--panel-2);
+}
+
+.spotter__remove:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.survey__add {
+  align-self: flex-start;
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.survey__add:hover {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.survey__result {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border-top: 1px solid var(--line);
+  padding-top: 11px;
+}
+
+.survey__found {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.survey__grid {
+  font-family: var(--mono);
+  font-size: clamp(19px, 3.4vw, 25px);
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+.survey__solution {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.survey__use {
+  margin-left: auto;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--bg);
+  padding: 6px 15px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.survey__use:hover {
+  background: #f0b64a;
+}
+
+.survey__quality {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.survey__status {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.survey__status.is-warn {
+  color: var(--accent);
+}
+
+.survey__status.is-bad {
+  color: var(--danger);
+}
+
+.survey__error {
+  margin: 0;
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.survey__ambiguous {
+  border: 1px dashed var(--accent-dim);
+  border-radius: 6px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
 /* ---------- 目標の取り込み ---------- */
 
 .intake {
@@ -1284,6 +1534,55 @@ code {
 /* ---------- 画面が狭いとき ---------- */
 
 @media (max-width: 620px) {
+  /* 観測員の欄は横に 4 つ並ばないので、名前 / 位置 / 方位・距離 の 3 段に折る */
+  .spotter {
+    grid-template-columns: 1fr 1fr 28px;
+    grid-template-areas:
+      'label label remove'
+      'grid  grid  grid'
+      'bear  range range';
+    gap: 5px;
+  }
+
+  .spotter--header {
+    display: none;
+  }
+
+  .spotter__label {
+    grid-area: label;
+  }
+
+  .spotter__grid {
+    grid-area: grid;
+  }
+
+  .spotter__num:nth-of-type(3) {
+    grid-area: bear;
+  }
+
+  .spotter__num:nth-of-type(4) {
+    grid-area: range;
+  }
+
+  .spotter__remove {
+    grid-area: remove;
+    justify-self: end;
+  }
+
+  .survey__use {
+    margin-left: 0;
+  }
+
+  .survey__toggle {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .survey__summary {
+    margin-left: 0;
+    text-align: left;
+  }
+
   /* 砲塔の脇に弾を並べる幅が無いので、図の下に左右で並べる */
   .loadout {
     grid-template-columns: 1fr 1fr;
