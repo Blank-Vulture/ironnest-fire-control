@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FixCard } from '../components/FixCard'
 import { GridMap } from '../components/GridMap'
+import { NestPanel } from '../components/NestPanel'
 import { formatPoint } from '../lib/grid'
 import {
   MAP_HEIGHT_KM,
@@ -13,6 +14,7 @@ import {
 } from '../lib/grid'
 import { planConvoyRequest } from '../lib/convoy'
 import {
+  NEST_FIX_ID,
   availableSources,
   solveSurvey,
   type Fix,
@@ -66,9 +68,6 @@ export function emptySurveyDoc(): SurveyDoc {
  * 「距離が重なる地点をまず出し、そこからの方位で目標を出す」という
  * 段を重ねた任務がそのまま組める。
  */
-/** 自機の現在地を割り出すための標定。押し直しても増えないよう id を固定する。 */
-const NEST_FIX_ID = 'nest-position'
-
 export function Plotting({ doc, onChange, onAddTarget }: Props) {
   const [pasteError, setPasteError] = useState<string[]>([])
   const [highlight, setHighlight] = useState<string | null>(null)
@@ -172,10 +171,22 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
     })
   }
 
-  // 親のすぐ下に子を並べる。補給隊が IRON NEST にぶら下がって見えるように。
-  const orderedKnown = doc.known
-    .filter((k) => k.parentId === undefined)
-    .flatMap((point) => [point, ...doc.known.filter((k) => k.parentId === point.id)])
+  // 自機は観測員でも目標でもないので、専用の区画に出す。
+  // 補給隊もその流れの一部なので、既知点の一覧には並べない。
+  const nest = doc.known.find((k) => k.isNest)
+  const convoys = doc.known.filter((k) => nest !== undefined && k.parentId === nest.id)
+  const spotters = doc.known.filter((k) => !k.isNest && k.parentId === undefined)
+  const selfFix = survey.fixes.find((f) => f.fix.id === NEST_FIX_ID)
+  const targetFixes = survey.fixes.filter((f) => f.fix.id !== NEST_FIX_ID)
+
+  /** 位置報告の要請を片付ける。補給隊とその標定を消す。 */
+  const cancelConvoys = () => {
+    if (nest === undefined) return
+    onChange({
+      known: doc.known.filter((k) => k.parentId !== nest.id),
+      fixes: doc.fixes.filter((f) => f.id !== NEST_FIX_ID),
+    })
+  }
 
   return (
     <>
@@ -186,28 +197,49 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
         onHighlight={setHighlight}
       />
 
+      {nest !== undefined && (
+        <NestPanel
+          nest={nest}
+          convoys={convoys}
+          selfFix={selfFix}
+          onNestGrid={(gridInput) => patchKnown(nest.id, { gridInput })}
+          onConvoyGrid={(convoyId, gridInput) => patchKnown(convoyId, { gridInput })}
+          onSighting={(sightingId, change) => {
+            const fix = doc.fixes.find((f) => f.id === NEST_FIX_ID)
+            if (fix === undefined) return
+            patchFix(NEST_FIX_ID, {
+              sightings: fix.sightings.map((s) =>
+                s.id === sightingId ? { ...s, ...change } : s,
+              ),
+            })
+          }}
+          onRequest={requestConvoys}
+          onCancel={cancelConvoys}
+          onAdopt={() => adoptAsNest(NEST_FIX_ID)}
+          onHighlight={setHighlight}
+        />
+      )}
+
       <section className="known">
         <div className="known__head">
-          <h2 className="section__title">既知点</h2>
+          <h2 className="section__title">観測員</h2>
           <span className="section__hint">
             クリップボードの名簿（<code>Spotter1 - I9 9:1</code>）をどこかの欄に貼ると振り分けます
           </span>
         </div>
 
         <ol className="known__list">
-          {orderedKnown.map((point) => {
+          {spotters.map((point) => {
             const bad = point.gridInput !== '' && parseGrid(point.gridInput) === null
             return (
               <li
                 key={point.id}
-                className={`known__row${point.isNest ? ' is-nest' : ''}${
-                  point.parentId !== undefined ? ' is-child' : ''
-                }`}
+                className="known__row"
                 onMouseEnter={() => setHighlight(point.id)}
                 onMouseLeave={() => setHighlight((h) => (h === point.id ? null : h))}
               >
                 <span className="known__mark" aria-hidden>
-                  {point.isNest ? '◉' : '○'}
+                  ○
                 </span>
                 <input
                   className="known__label"
@@ -227,28 +259,12 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
                   aria-label="グリッド座標"
                   aria-invalid={bad}
                 />
-                {point.isNest && (
-                  <button
-                    className="known__update"
-                    onClick={requestConvoys}
-                    title="緊急移動のあと。移動前の座標を手がかりに、補給隊へ位置報告を要請する先を決めます"
-                  >
-                    座標を更新
-                  </button>
-                )}
-
                 <button
                   className="known__remove"
                   onClick={() =>
-                    onChange({
-                      ...doc,
-                      known: doc.known.filter(
-                        (k) => k.id !== point.id && k.parentId !== point.id,
-                      ),
-                    })
+                    onChange({ ...doc, known: doc.known.filter((k) => k.id !== point.id) })
                   }
-                  disabled={point.isNest}
-                  title={point.isNest ? 'IRON NEST は消せません' : '削除'}
+                  title="削除"
                   aria-label={`${point.label} を削除`}
                 >
                   ✕
@@ -261,10 +277,10 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
         <button
           className="section__add"
           onClick={() =>
-            onChange({ ...doc, known: [...doc.known, newKnownPoint(doc.known.length)] })
+            onChange({ ...doc, known: [...doc.known, newKnownPoint(spotters.length + 1)] })
           }
         >
-          ＋ 点を追加
+          ＋ 観測員を追加
         </button>
 
         {pasteError.length > 0 && (
@@ -283,7 +299,7 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
         </div>
 
         <div className="fixes__list">
-          {survey.fixes.map((resolved) => (
+          {targetFixes.map((resolved) => (
             <FixCard
               key={resolved.fix.id}
               resolved={resolved}

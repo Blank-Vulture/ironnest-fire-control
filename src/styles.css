@@ -411,7 +411,493 @@ code {
   color: var(--accent);
 }
 
+/* ---------- IRON NEST の区画 ---------- */
+
+.nest {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.nest__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nest__k {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.nest__current {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.nest__coord {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nest__grid {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 11px;
+  font-family: var(--mono);
+  font-size: clamp(17px, 2.6vw, 21px);
+  width: 7em;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.nest__grid:focus {
+  border-color: var(--accent);
+}
+
+.nest__grid.is-invalid {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.nest__grid::placeholder {
+  color: #4a5361;
+}
+
+.nest__request {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  color: var(--accent);
+  padding: 7px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nest__request:hover {
+  background: var(--panel-2);
+  border-color: var(--accent);
+}
+
+/* ---------- 補給隊への要請 ---------- */
+
+.nest__survey {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border-top: 1px solid var(--line);
+  padding-top: 11px;
+}
+
+.nest__surveyhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nest__surveytitle {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.nest__cancel {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.nest__cancel:hover {
+  color: var(--danger);
+  background: var(--panel-2);
+}
+
+.nest__note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.nest__note strong {
+  color: var(--text);
+}
+
+.nest__convoys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.convoy {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) 6em 5.5em 5.5em;
+  gap: 7px;
+  align-items: center;
+}
+
+.convoy--header {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.convoy--header span:nth-child(3),
+.convoy--header span:nth-child(4) {
+  text-align: right;
+}
+
+.convoy__label {
+  font-size: 12px;
+}
+
+.convoy__grid,
+.convoy__num {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-family: var(--mono);
+  min-width: 0;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.convoy__num {
+  text-align: right;
+}
+
+.convoy__grid:focus,
+.convoy__num:focus {
+  border-color: var(--accent);
+}
+
+.convoy__grid.is-invalid {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.convoy__grid::placeholder,
+.convoy__num::placeholder {
+  color: #4a5361;
+}
+
+.nest__result {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.nest__found {
+  font-family: var(--mono);
+  font-size: clamp(18px, 2.8vw, 23px);
+  color: var(--accent);
+}
+
+.nest__quality {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.nest__pending {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.nest__adopt {
+  margin-left: auto;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--bg);
+  padding: 6px 15px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nest__adopt:hover {
+  background: #f0b64a;
+}
+
+.nest__warn {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--accent);
+}
+
 /* ---------- 既知点 ---------- */
+/* ---------- IRON NEST の区画 ---------- */
+
+.nest {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.nest__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nest__k {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.nest__current {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.nest__coord {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nest__grid {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 11px;
+  font-family: var(--mono);
+  font-size: clamp(17px, 2.6vw, 21px);
+  width: 7em;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.nest__grid:focus {
+  border-color: var(--accent);
+}
+
+.nest__grid.is-invalid {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.nest__grid::placeholder {
+  color: #4a5361;
+}
+
+.nest__request {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  color: var(--accent);
+  padding: 7px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nest__request:hover {
+  background: var(--panel-2);
+  border-color: var(--accent);
+}
+
+/* ---------- 補給隊への要請 ---------- */
+
+.nest__survey {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border-top: 1px solid var(--line);
+  padding-top: 11px;
+}
+
+.nest__surveyhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nest__surveytitle {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.nest__cancel {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.nest__cancel:hover {
+  color: var(--danger);
+  background: var(--panel-2);
+}
+
+.nest__note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.nest__note strong {
+  color: var(--text);
+}
+
+.nest__convoys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.convoy {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) 6em 5.5em 5.5em;
+  gap: 7px;
+  align-items: center;
+}
+
+.convoy--header {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.convoy--header span:nth-child(3),
+.convoy--header span:nth-child(4) {
+  text-align: right;
+}
+
+.convoy__label {
+  font-size: 12px;
+}
+
+.convoy__grid,
+.convoy__num {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-family: var(--mono);
+  min-width: 0;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.convoy__num {
+  text-align: right;
+}
+
+.convoy__grid:focus,
+.convoy__num:focus {
+  border-color: var(--accent);
+}
+
+.convoy__grid.is-invalid {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.convoy__grid::placeholder,
+.convoy__num::placeholder {
+  color: #4a5361;
+}
+
+.nest__result {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.nest__found {
+  font-family: var(--mono);
+  font-size: clamp(18px, 2.8vw, 23px);
+  color: var(--accent);
+}
+
+.nest__quality {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.nest__pending {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.nest__adopt {
+  margin-left: auto;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--bg);
+  padding: 6px 15px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nest__adopt:hover {
+  background: #f0b64a;
+}
+
+.nest__warn {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--accent);
+}
+
 /* ---------- 既知点 ---------- */
 
 .known,
@@ -440,7 +926,7 @@ code {
 
 .known__row {
   display: grid;
-  grid-template-columns: 18px minmax(80px, 1fr) 9em auto 28px;
+  grid-template-columns: 18px minmax(80px, 1fr) 9em 28px;
   gap: 8px;
   align-items: center;
   background: var(--panel);
@@ -449,40 +935,10 @@ code {
   padding: 6px 10px;
 }
 
-.known__row.is-nest {
-  border-color: var(--accent-dim);
-}
-
-/* 補給隊は IRON NEST にぶら下げて見せる */
-.known__row.is-child {
-  margin-left: 22px;
-  border-style: dashed;
-}
-
-.known__update {
-  background: none;
-  border: 1px solid var(--accent-dim);
-  border-radius: 6px;
-  color: var(--accent);
-  padding: 5px 12px;
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.known__update:hover {
-  background: var(--panel-2);
-  border-color: var(--accent);
-}
-
 .known__mark {
   color: var(--muted);
   font-size: 11px;
   text-align: center;
-}
-
-.known__row.is-nest .known__mark {
-  color: var(--accent);
 }
 
 .known__label,
@@ -2094,18 +2550,40 @@ code {
     grid-template-columns: 18px 1fr 28px;
     grid-template-areas:
       'mark label remove'
-      '.    grid  grid'
-      '.    update update';
+      '.    grid  grid';
     row-gap: 5px;
   }
 
-  .known__update {
-    grid-area: update;
-    justify-self: start;
+  /* 補給隊の欄も横に 4 つ並ばないので、名前と要請先を上の段に出す */
+  .convoy {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'label grid'
+      'bear  range';
+    gap: 5px;
   }
 
-  .known__row.is-child {
-    margin-left: 12px;
+  .convoy--header {
+    display: none;
+  }
+
+  .convoy__label {
+    grid-area: label;
+    align-self: center;
+  }
+  .convoy__grid {
+    grid-area: grid;
+  }
+  .convoy__num:nth-of-type(1) {
+    grid-area: bear;
+  }
+  .convoy__num:nth-of-type(2) {
+    grid-area: range;
+  }
+
+  .nest__request,
+  .nest__adopt {
+    margin-left: 0;
   }
 
   .known__mark {

@@ -20,6 +20,14 @@ import { triangulate, type Observation, type Triangulation } from './triangulate
 
 export type PointId = string
 
+/**
+ * 自機の現在地を割り出すための標定に振る id。
+ *
+ * 押し直しても増えないよう固定してある。この点だけは敵ではなく自機なので、
+ * 地図でも自機の色で描く。
+ */
+export const NEST_FIX_ID = 'nest-position'
+
 /** 位置がグリッドで分かっている点。観測員や砲座。 */
 export interface KnownPoint {
   id: PointId

@@ -7,7 +7,7 @@ import {
   type Point,
 } from '../lib/grid'
 import { parseBearing, parseDistance } from '../lib/targets'
-import type { SurveyDoc, SurveyResult } from '../lib/survey'
+import { NEST_FIX_ID, type SurveyDoc, type SurveyResult } from '../lib/survey'
 
 interface Props {
   doc: SurveyDoc
@@ -157,12 +157,14 @@ export function GridMap({ doc, survey, highlight, onHighlight }: Props) {
   for (const resolved of survey.fixes) {
     if (resolved.status.kind !== 'solved') continue
     const ambiguous = resolved.alternative !== null
+    // 自機の現在地を割り出している点だけは敵ではないので、自機の色で描く
+    const self = resolved.fix.id === NEST_FIX_ID
     markers.push({
       id: resolved.fix.id,
       kind: 'fix',
       name: ambiguous ? `${resolved.fix.label}（候補地 1）` : resolved.fix.label,
       at: resolved.status.position,
-      color: HOSTILE,
+      color: self ? 'var(--accent)' : HOSTILE,
     })
     if (resolved.alternative !== null) {
       markers.push({
@@ -170,7 +172,7 @@ export function GridMap({ doc, survey, highlight, onHighlight }: Props) {
         kind: 'alt',
         name: `${resolved.fix.label}（候補地 2）`,
         at: resolved.alternative,
-        color: HOSTILE_DIM,
+        color: self ? 'var(--accent-dim)' : HOSTILE_DIM,
       })
     }
   }
