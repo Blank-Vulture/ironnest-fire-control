@@ -427,3 +427,162 @@ describe('弾倉と補給', () => {
     expect(resupplyQueue(buildPlan(after).steps, 'left')).toHaveLength(0)
   })
 })
+
+describe('方位の境界（0 度をまたぐ並べ替え）', () => {
+  const order = (plan: ReturnType<typeof buildPlan>) =>
+    plan.steps.map((s) => s.solution.target.bearingDeg)
+  const turns = (plan: ReturnType<typeof buildPlan>) => plan.steps.map((s) => s.turnFromPrev)
+
+  /** 実装とは別に、隣り合う目標の隙間のうち最大のものを求める。 */
+  const widestGap = (bearings: readonly number[]) => {
+    const sorted = [...bearings].sort((a, b) => a - b)
+    let widest = 0
+    for (let i = 0; i < sorted.length; i++) {
+      const gap = (((sorted[(i + 1) % sorted.length]! - sorted[i]!) % 360) + 360) % 360
+      widest = Math.max(widest, gap)
+    }
+    return widest
+  }
+
+  it('359 度と 1 度は隣として扱う', () => {
+    // 0 度をまたぐ 2 度の隙間を通り、150 度へは 149 度で届く。
+    // 数値の大小で並べると 1 → 150 → 359 になってしまい、209 度が無駄になる。
+    const plan = buildPlan([at(359, 5), at(1, 5), at(150, 5)])
+    expect(order(plan)).toEqual([359, 1, 150])
+    expect(turns(plan)).toEqual([null, 2, 149])
+    expect(plan.totalTurnDeg).toBeCloseTo(151)
+  })
+
+  it('入力の順番を変えても同じ射撃順になる', () => {
+    const bearings = [359, 1, 150]
+    const expected = [359, 1, 150]
+    for (const perm of [
+      [359, 1, 150],
+      [1, 150, 359],
+      [150, 359, 1],
+      [1, 359, 150],
+      [150, 1, 359],
+      [359, 150, 1],
+    ]) {
+      expect(order(buildPlan(perm.map((b) => at(b, 5))))).toEqual(expected)
+      expect(perm).toHaveLength(bearings.length)
+    }
+  })
+
+  it('0 度をまたぐ 2 点で、遠回りしない', () => {
+    const plan = buildPlan([at(350, 5), at(10, 5)])
+    expect(order(plan)).toEqual([350, 10])
+    expect(plan.totalTurnDeg).toBeCloseTo(20) // 340 度ではなく 20 度
+  })
+
+  it('0 度を跨いだ小数の並びも崩れない', () => {
+    const plan = buildPlan([at(359.9, 5), at(0.1, 5)])
+    expect(order(plan)).toEqual([359.9, 0.1])
+    expect(plan.totalTurnDeg).toBeCloseTo(0.2)
+  })
+
+  it('0 度をまたいで連続する目標を順に舐める', () => {
+    const plan = buildPlan([at(358, 5), at(359, 5), at(0, 5), at(1, 5), at(2, 5)])
+    expect(order(plan)).toEqual([358, 359, 0, 1, 2])
+    expect(turns(plan)).toEqual([null, 1, 1, 1, 1])
+    expect(plan.totalTurnDeg).toBeCloseTo(4)
+  })
+
+  it('方位が同じなら旋回不要になる', () => {
+    const plan = buildPlan([at(90, 5), at(90, 5), at(200, 5)])
+    expect(turns(plan)[1]).toBe(0)
+    expect(plan.totalTurnDeg).toBeCloseTo(110)
+  })
+
+  it('全部同じ方位なら一度も旋回しない', () => {
+    const plan = buildPlan([at(42, 5), at(42, 5), at(42, 5)])
+    expect(plan.totalTurnDeg).toBe(0)
+  })
+
+  it('正反対の 2 点はどちら回りでも 180 度', () => {
+    const plan = buildPlan([at(0, 5), at(180, 5)])
+    expect(plan.totalTurnDeg).toBeCloseTo(180)
+    expect(Math.abs(turns(plan)[1]!)).toBeCloseTo(180)
+  })
+
+  it('1 回の旋回が 180 度を超えることはない', () => {
+    const sets = [
+      [359, 1, 150],
+      [0, 90, 180, 270],
+      [5, 185],
+      [10, 200, 210],
+      [1, 2, 359],
+      [100, 279, 280],
+    ]
+    for (const bearings of sets) {
+      for (const step of buildPlan(bearings.map((b) => at(b, 5))).steps) {
+        if (step.turnFromPrev !== null) expect(Math.abs(step.turnFromPrev)).toBeLessThanOrEqual(180)
+      }
+    }
+  })
+
+  it('総旋回は「一周 − いちばん広い隙間」に一致する', () => {
+    // 乱数の種を固定して、円周上の散らばり方をひととおり試す
+    let seed = 20260823
+    const random = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed / 2147483648
+    }
+    for (let trial = 0; trial < 200; trial++) {
+      const count = 2 + Math.floor(random() * 7)
+      const bearings = Array.from({ length: count }, () =>
+        Math.round(random() * 3599) / 10,
+      )
+      const plan = buildPlan(bearings.map((b) => at(b, 5)))
+      expect(plan.totalTurnDeg).toBeCloseTo(360 - widestGap(bearings), 6)
+    }
+  })
+})
+
+describe('撃った後の境界（0 度をまたぐ引き継ぎ）', () => {
+  const firedAt = (bearing: number): Target => ({
+    ...newTarget(bearing, 5),
+    done: true,
+    firedAt: 1,
+    firedGun: 'left',
+  })
+
+  it('弧の手前端が 0 度の向こう側なら、左へ戻ってから右回りに流す', () => {
+    // 砲塔は 1 度を向いている。359 度へは左に 2 度、150 度へは右に 149 度。
+    // 359 に戻ってから 150 へ流す方が、150 を先に撃つより安い。
+    // 最初の 1 手だけが左で、そこから先は右回りになる。
+    const plan = buildPlan([firedAt(1), at(359, 5), at(150, 5)])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([359, 150])
+    expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(-2) // 左へ 2 度
+    expect(plan.steps[1]!.turnFromPrev).toBeCloseTo(151)
+    expect(plan.totalTurnDeg).toBeCloseTo(153)
+  })
+
+  it('0 度をまたいで進む方が近ければ右回りのまま', () => {
+    const plan = buildPlan([firedAt(359), at(1, 5), at(150, 5)])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([1, 150])
+    expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(2)
+    expect(plan.totalTurnDeg).toBeCloseTo(151)
+  })
+
+  it('0 度をまたぐ塊を、まるごと左回りに舐める', () => {
+    // 残りは 350・10・20 の塊。砲塔は 20 度の少し先の 25 度を向いている。
+    // 手前端 350 まで右に 35 度戻すより、奥端 20 から左へ舐めて 0 度を跨ぐ方が安い。
+    const plan = buildPlan([firedAt(25), at(350, 5), at(10, 5), at(20, 5)])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([20, 10, 350])
+    expect(plan.steps.map((s) => s.turnFromPrev)).toEqual([-5, -10, -20])
+    expect(plan.totalTurnDeg).toBeCloseTo(35) // 時計回りに回ると 65 度かかる
+  })
+
+  it('手前端の方が近ければ、0 度をまたぐ塊でも右回りに舐める', () => {
+    const plan = buildPlan([firedAt(5), at(350, 5), at(10, 5), at(20, 5)])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([350, 10, 20])
+    expect(plan.steps.map((s) => s.turnFromPrev)).toEqual([-15, 20, 10])
+    expect(plan.totalTurnDeg).toBeCloseTo(45)
+  })
+
+  it('砲塔が目標と同じ方位なら、最初の旋回は 0 になる', () => {
+    const plan = buildPlan([firedAt(359.9), at(359.9, 5), at(10, 5)])
+    expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(0)
+  })
+})
