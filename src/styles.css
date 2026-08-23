@@ -1,0 +1,870 @@
+/* --------------------------------------------------------------------------
+   Iron Nest Fire Control — 表示系
+
+   試合中の一瞬しか見られないので、優先順位は
+   「答えが大きい > 迷わない > 装飾」の順。
+   射撃解はゲーム内で紙のカードとして刷られるので、こちらも紙で表す。
+   -------------------------------------------------------------------------- */
+
+:root {
+  --bg: #0b0d10;
+  --panel: #14181e;
+  --panel-2: #1a1f26;
+  --line: #262d36;
+  --text: #e6e9ee;
+  --muted: #8892a0;
+  --accent: #e0a437;
+  --accent-dim: #7a5c1f;
+  --danger: #e05a4a;
+
+  /* 弾道計算機が刷る紙。褪せた藁半紙の色で、暗所でも眩しくない */
+  --paper: #cdc5b1;
+  --paper-2: #c0b7a1;
+  --paper-line: #a49a83;
+  --ink: #26241f;
+  --ink-soft: #5d5748;
+  --stamp: #a8342a;
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+
+  --radius: 10px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  /* 数字が揃わないと読み違えるので全体で等幅数字にする */
+  font-variant-numeric: tabular-nums;
+}
+
+body {
+  min-height: 100dvh;
+  padding: clamp(12px, 3vw, 32px);
+}
+
+.app {
+  max-width: 1020px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2vw, 22px);
+}
+
+input,
+button,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+code {
+  font-family: var(--mono);
+  background: var(--panel-2);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  font-size: 0.92em;
+}
+
+/* ---------- ヘッダ ---------- */
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.topbar__title {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: clamp(15px, 3vw, 19px);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.topbar__accent {
+  color: var(--accent);
+}
+
+.topbar__sub {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- 目標の取り込み ---------- */
+
+.intake {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.intake__label {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.intake__hint {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.intake__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* 単位は打たせず、欄の中に印字だけしておく */
+.intake__cell {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 16px 10px;
+  min-width: 0;
+  transition: border-color 120ms ease;
+}
+
+.intake__cell:focus-within {
+  border-color: var(--accent);
+}
+
+.intake__cell.is-invalid {
+  border-color: var(--danger);
+}
+
+.intake__cellname {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+.intake__field {
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: clamp(22px, 4vw, 30px);
+  letter-spacing: 0.03em;
+  outline: none;
+}
+
+.intake__field::placeholder {
+  color: #39414d;
+}
+
+.intake__unit {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.intake__add {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 0 22px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.intake__add:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.intake__add:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.intake__error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+/* ---------- 射撃計画 ---------- */
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plan--empty {
+  align-items: center;
+  gap: 16px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: clamp(20px, 5vw, 40px);
+}
+
+.plan--empty .turret {
+  max-width: 120px;
+}
+
+.plan__placeholder {
+  margin: 0;
+  max-width: 46ch;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.plan__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.plan__title {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.plan__stats {
+  display: flex;
+  gap: 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.plan__stats strong {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.plan__board {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plan__turret {
+  display: flex;
+  justify-content: center;
+}
+
+.plan__turret .turret {
+  max-width: 132px;
+}
+
+/* 砲身が列の真上に来るので、どちらの列がどちらの砲か図で分かる */
+.plan__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(10px, 2vw, 18px);
+}
+
+.plan__column {
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  font-weight: 500;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+/* 左右 1 発ずつを 1 行に。真ん中の溝に行内の旋回量を置く */
+.pair {
+  display: grid;
+  grid-template-columns: 1fr clamp(74px, 9vw, 104px) 1fr;
+  align-items: start;
+  gap: 0;
+}
+
+.pair__gutter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  padding: 0 6px;
+}
+
+.plan__blank {
+  /* 相方のいない行でも列がずれないように場所だけ取る */
+  min-height: 1px;
+}
+
+/* ---------- 旋回量（連続射撃の律速） ---------- */
+
+.turn,
+.stall {
+  margin: 0;
+  font-family: var(--mono);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--accent-dim);
+  color: var(--accent);
+  background: var(--panel);
+  white-space: nowrap;
+}
+
+/* 行間の旋回は横切る線として置き、組の切れ目を見せる */
+.turn--lead {
+  width: fit-content;
+  margin: 10px auto;
+  font-size: 13px;
+}
+
+/* 行内の旋回は溝に収めるので、縦組みにして幅を食わない形にする */
+.turn--mid {
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+}
+
+.turn.is-none {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.turn__icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.stall {
+  width: fit-content;
+  margin: 0 auto 8px;
+  border-color: var(--danger);
+  color: var(--danger);
+  font-family: var(--sans);
+  font-size: 11px;
+}
+
+/* ---------- 射撃解のカード（ゲーム内で刷られる紙） ---------- */
+
+.card {
+  background: linear-gradient(160deg, var(--paper) 0%, var(--paper-2) 100%);
+  color: var(--ink);
+  border-radius: 3px;
+  padding: 12px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-variant-numeric: tabular-nums;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 6px 14px rgba(0, 0, 0, 0.4);
+}
+
+/* 左右の砲を紙の端の色で区別する。列と合わせて二重に分かるように */
+.card--left {
+  border-left: 4px solid var(--stamp);
+}
+
+.card--right {
+  border-right: 4px solid var(--stamp);
+}
+
+.card.is-unreachable {
+  filter: saturate(0.5);
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--paper-line);
+  padding-bottom: 8px;
+}
+
+.card__order {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--stamp);
+  border: 2px solid var(--stamp);
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  /* ゲーム内の朱印に寄せて、わずかに傾ける */
+  transform: rotate(-7deg);
+}
+
+.card__gun {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.card__gunbtn {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  width: 26px;
+  height: 24px;
+  border: 1px solid var(--paper-line);
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.card__gunbtn:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.card__gunbtn.is-on {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.card__pin {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--stamp);
+  border: 1px solid var(--stamp);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.card__remove {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 3px;
+}
+
+.card__remove:hover {
+  color: var(--stamp);
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.card__k {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.card__selects {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.card__select {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.card__select select {
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--paper-line);
+  border-radius: 3px;
+  color: var(--ink);
+  padding: 5px 6px;
+  font-size: 12px;
+  max-width: 100%;
+  cursor: pointer;
+}
+
+.card__select--charge select {
+  font-family: var(--mono);
+}
+
+.card__solution {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  border-block: 1px solid var(--paper-line);
+  padding-block: 8px;
+}
+
+.card__elev,
+.card__bearing {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.card__elevvalue,
+.card__bearingvalue {
+  font-family: var(--mono);
+  font-size: clamp(21px, 3.6vw, 27px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+}
+
+.card__bearingvalue {
+  color: var(--ink-soft);
+}
+
+.card__meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 11px;
+}
+
+.card__meta div {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.card__meta dt {
+  color: var(--ink-soft);
+}
+
+.card__meta dd {
+  margin: 0;
+  font-family: var(--mono);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.card__tag {
+  font-family: var(--sans);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--paper-line);
+  border-radius: 3px;
+  padding: 0 4px;
+  color: var(--ink-soft);
+}
+
+.card__tag--warn {
+  border-color: var(--stamp);
+  color: var(--stamp);
+}
+
+.card__warn {
+  margin: 0;
+  font-size: 11px;
+  color: var(--stamp);
+  border: 1px dashed var(--stamp);
+  border-radius: 3px;
+  padding: 5px 8px;
+}
+
+.card__timing {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.card__field input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--paper-line);
+  border-radius: 3px;
+  padding: 5px 7px;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+}
+
+.card__field input:focus {
+  border-color: var(--ink);
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.card__field input::placeholder {
+  color: var(--ink-soft);
+  opacity: 0.6;
+}
+
+.card__field input[aria-invalid='true'] {
+  border-color: var(--stamp);
+  color: var(--stamp);
+}
+
+.card__launch {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border-top: 2px solid var(--ink);
+  padding-top: 7px;
+}
+
+.card__launch strong {
+  font-family: var(--mono);
+  font-size: clamp(20px, 3.4vw, 26px);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.card__launch.is-empty strong {
+  color: var(--ink-soft);
+  opacity: 0.5;
+}
+
+/* ---------- 射程外 ---------- */
+
+.plan__unplaced {
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+
+.plan__unplaced h3 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--danger);
+}
+
+.plan__unplaced ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.plan__unplaced li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.plan__unplaced button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.plan__unplaced button:hover {
+  color: var(--danger);
+}
+
+/* ---------- 砲座の図 ---------- */
+
+.turret {
+  width: 100%;
+  height: auto;
+}
+
+.turret__legs path {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.turret__body {
+  fill: var(--panel);
+  stroke: var(--line);
+  stroke-width: 2;
+}
+
+.turret__cylinder,
+.turret__mantlet {
+  fill: var(--panel-2);
+  stroke: var(--line);
+  stroke-width: 2;
+}
+
+.turret__barrel rect {
+  fill: var(--panel-2);
+  stroke: var(--line);
+  stroke-width: 2;
+  transition:
+    fill 160ms ease,
+    stroke 160ms ease;
+}
+
+.turret__mark {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  text-anchor: middle;
+  fill: var(--muted);
+  transition: fill 160ms ease;
+}
+
+/* 最初に撃つ砲を光らせる */
+.turret__barrel.is-first rect {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.turret__barrel.is-first .turret__mark {
+  fill: var(--accent);
+}
+
+.turret__barrel.is-second rect {
+  fill: var(--panel-2);
+  stroke: var(--accent-dim);
+}
+
+.turret__barrel.is-second .turret__mark {
+  fill: var(--accent-dim);
+}
+
+/* ---------- その他 ---------- */
+
+.clear {
+  align-self: flex-start;
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 12px;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.clear:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.footnote {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.75;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.footnote p {
+  margin: 0;
+}
+
+.footnote strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------- 画面が狭いとき ---------- */
+
+@media (max-width: 620px) {
+  /* 縦の余白は削る。試合中にスクロールが増えるのがいちばん困る */
+  .plan__turret .turret {
+    max-width: 88px;
+  }
+
+  /* 溝を挟む余裕が無いので縦に積む。左右のカードの順序は保つ */
+  .pair {
+    grid-template-columns: 1fr;
+  }
+
+  .pair__gutter {
+    padding: 8px 0;
+  }
+
+  .turn--mid {
+    flex-direction: row;
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px;
+  }
+
+  .plan__blank {
+    display: none;
+  }
+
+  .plan__cols {
+    display: none;
+  }
+
+  .intake__row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .intake__add {
+    grid-column: 1 / -1;
+    padding: 10px;
+  }
+
+  .intake__add {
+    padding: 10px;
+  }
+}
