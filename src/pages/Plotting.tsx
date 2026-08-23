@@ -17,6 +17,7 @@ import { planConvoyRequest } from '../lib/convoy'
 import {
   NEST_FIX_ID,
   availableSources,
+  isFixDurable,
   labelForRole,
   nextReferenceLabel,
   nextTargetLabel,
@@ -27,6 +28,7 @@ import {
   type Sighting,
   type SurveyDoc,
 } from '../lib/survey'
+import { isShellCode, type ShellCode } from '../lib/shells'
 import type { Measurement, Target } from '../lib/targets'
 import type { TargetOrigin } from '../App'
 
@@ -43,6 +45,8 @@ interface Props {
   onNestMoved: (from: Point, to: Point) => void
   /** 元に戻せるよう、構造を動かす操作の前に呼ぶ。 */
   onRemember: (label: string) => void
+  /** 弾種の変更。紐づく射撃順のカードがあれば、そちらの弾種も合わせて変わる。 */
+  onFixShell: (fixId: string, shell: ShellCode) => void
 }
 
 const id = (prefix: string) =>
@@ -119,6 +123,7 @@ export function Plotting({
   onRemoveFix,
   onNestMoved,
   onRemember,
+  onFixShell,
 }: Props) {
   const [pasteError, setPasteError] = useState<string[]>([])
   const [highlight, setHighlight] = useState<string | null>(null)
@@ -575,7 +580,9 @@ export function Plotting({
                 })
               }
               onRemove={() => onRemoveFix(resolved.fix.id)}
+              durable={isFixDurable(doc, resolved.fix.id)}
               onAddTarget={onAddTarget}
+              onShell={(code) => isShellCode(code) && onFixShell(resolved.fix.id, code)}
               onToggleReference={() => {
                 // 役割が変われば呼び名も変わる。手で付けた名前はそのまま残す
                 const becoming = !resolved.fix.isReference

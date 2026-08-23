@@ -15,6 +15,7 @@
  */
 
 import { gridToPoint, parseGrid, type Point } from './grid'
+import { DEFAULT_SHELL, type ShellCode } from './shells'
 import { parseBearing, parseDistance } from './targets'
 import { triangulate, type Observation, type Triangulation } from './triangulate'
 
@@ -95,6 +96,13 @@ export interface Fix {
    * 書き換えれば直せる。入っている間は三角測量より優先し、誤差は 0 として扱う。
    */
   pinnedGrid?: string
+  /**
+   * この標定で撃つ弾種。
+   *
+   * 「射撃順に追加」で新しいカードを作るときの初期値になり、以降は
+   * カード側とここを双方向に同期する。未設定なら既定弾（HE）として扱う。
+   */
+  shell?: ShellCode
 }
 
 export interface SurveyDoc {
@@ -377,6 +385,19 @@ export function isFixDurable(doc: SurveyDoc, fixId: PointId): boolean {
   return measured || usedAsSource
 }
 
+/**
+ * 標定を削除する。
+ *
+ * 片づけに巻き込んでよい（isFixDurable が false の）標定だけを消す。
+ * 実測座標を持つ標定は基準点として残る情報なので、✕ を押しても消えない
+ * ようにする。他の標定の観測元になっている標定も同様で、消すと連鎖が切れる。
+ * 呼び出し側は、この標定から出した射撃順のカードだけ別に消す。
+ */
+export function removeFixIfRemovable(doc: SurveyDoc, fixId: PointId): SurveyDoc {
+  if (isFixDurable(doc, fixId)) return doc
+  return { ...doc, fixes: doc.fixes.filter((f) => f.id !== fixId) }
+}
+
 /** 座標が定まっていて、これ以上の観測を要しない標定。既知点として扱える。 */
 export function settledFixes(doc: SurveyDoc): Fix[] {
   return doc.fixes.filter(
@@ -456,4 +477,23 @@ export function labelForRole(
   return becomingReference
     ? nextReferenceLabel(doc, fix.id)
     : nextTargetLabel(doc, fix.id)
+}
+
+/* ---------- 弾種 ---------- */
+
+/** その標定で撃つ弾種。未設定なら既定弾（HE）。 */
+export function defaultShellFor(fix: Fix | undefined): ShellCode {
+  return fix?.shell ?? DEFAULT_SHELL
+}
+
+/**
+ * 標定の弾種を書き換える。
+ *
+ * 標定カードで選んだ弾種と、そこから出た射撃順のカードの弾種は同じものを
+ * 指すべきだが、勝手に追いかけ合う仕組みにすると無限ループになりやすい。
+ * そこで片方向ずつ、呼ばれたときだけ書き換える。ここは標定側の書き換えで、
+ * カード側からの書き換えを標定に映すときにも使う（App.tsx を参照）。
+ */
+export function applyFixShell(doc: SurveyDoc, fixId: PointId, shell: ShellCode): SurveyDoc {
+  return { ...doc, fixes: doc.fixes.map((f) => (f.id === fixId ? { ...f, shell } : f)) }
 }

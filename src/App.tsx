@@ -3,7 +3,10 @@ import { ROUTES, ROUTE_TITLE, useHashRoute } from './lib/route'
 import { emptySurveyDoc, Plotting } from './pages/Plotting'
 import { FireControl } from './pages/FireControl'
 import {
+  applyFixShell,
+  defaultShellFor,
   isFixDurable,
+  removeFixIfRemovable,
   solveSurvey,
   trackedPoint,
   type Fix,
@@ -12,6 +15,8 @@ import {
 import { firingSolutionFrom } from './lib/triangulate'
 import { formatPoint, parseGrid, pointFrom, type Point } from './lib/grid'
 import {
+  applyOriginShell,
+  applyTargetShell,
   buildPlan,
   newTarget,
   parseDistance,
@@ -20,6 +25,7 @@ import {
   type Target,
 } from './lib/targets'
 import { nextTargetLabel } from './lib/survey'
+import type { ShellCode } from './lib/shells'
 
 const TARGETS_KEY = 'iron-nest-timing/v4'
 const SURVEY_KEY = 'iron-nest-timing/survey/v2'
@@ -192,19 +198,24 @@ export function App() {
     })
   }, [survey])
 
-  /** 標定から射撃順へ送る。 */
+  /**
+   * 標定から射撃順へ送る。
+   * 標定側で弾種を選んでいれば、それをそのまま新しいカードに引き継ぐ。
+   */
   const sendToFireControl = useCallback(
     (measurement: Measurement, origin?: TargetOrigin) => {
+      const originFix = doc.fixes.find((f) => f.id === origin?.fixId)
       setTargets((prev) => [
         ...prev,
         {
           ...newTarget(measurement.bearingDeg, measurement.distanceKm),
+          shell: defaultShellFor(originFix),
           originFixId: origin?.fixId,
           candidate: origin?.candidate,
         },
       ])
     },
-    [],
+    [doc],
   )
 
   const patch = useCallback(
@@ -399,14 +410,40 @@ export function App() {
     [targets, doc, remember],
   )
 
-  /** 標定を消したら、そこから出した射撃順のカードも消す。 */
+  /**
+   * 標定を消したら、そこから出した射撃順のカードも消す。
+   *
+   * ただし実測座標を持つ標定や、他の標定の観測元になっている標定は
+   * 片づけに巻き込めない（isFixDurable）。基準点の情報が消えてしまうので、
+   * その場合は標定自体は残し、そこから出したカードだけを消す。
+   */
   const removeFix = useCallback(
     (fixId: string) => {
-      remember('標定を削除')
-      setDoc((prev) => ({ ...prev, fixes: prev.fixes.filter((f) => f.id !== fixId) }))
+      remember(isFixDurable(doc, fixId) ? '標定から出したカードを削除' : '標定を削除')
+      setDoc((prev) => removeFixIfRemovable(prev, fixId))
       setTargets((prev) => prev.filter((t) => t.originFixId !== fixId))
     },
-    [remember],
+    [doc, remember],
+  )
+
+  /**
+   * 標定側で弾種を変えたら、そこから出した射撃順のカードにも映す。
+   * カード側からの書き換え（setTargetShell）と合わせて双方向の同期になる。
+   */
+  const setFixShell = useCallback((fixId: string, shell: ShellCode) => {
+    setDoc((prev) => applyFixShell(prev, fixId, shell))
+    setTargets((prev) => applyOriginShell(prev, fixId, shell))
+  }, [])
+
+  /** 射撃順のカード側で弾種を変えたら、紐づく標定にも映す。 */
+  const setTargetShell = useCallback(
+    (targetId: string, shell: ShellCode) => {
+      const target = targets.find((t) => t.id === targetId)
+      setTargets((prev) => applyTargetShell(prev, targetId, shell))
+      if (target?.originFixId === undefined) return
+      setDoc((prev) => applyFixShell(prev, target.originFixId!, shell))
+    },
+    [targets],
   )
 
   /**
@@ -472,6 +509,7 @@ export function App() {
           onRemoveFix={removeFix}
           onNestMoved={reprojectLoose}
           onRemember={remember}
+          onFixShell={setFixShell}
         />
       ) : (
         <FireControl
@@ -479,6 +517,7 @@ export function App() {
           targetCount={targets.length}
           onAdd={(measurements) => measurements.forEach((m) => sendToFireControl(m))}
           onPatch={patch}
+          onShell={setTargetShell}
           onToggleDone={toggleDone}
           onReportOutcome={reportOutcome}
           onReportMiss={reportMiss}

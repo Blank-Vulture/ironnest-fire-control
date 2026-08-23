@@ -416,3 +416,26 @@ export function reprojectTarget(target: Target, from: Point, to: Point): Target 
     distanceKm: distanceBetween(to, absolute),
   }
 }
+
+/* ---------- 弾種の同期 ---------- */
+
+/** 1 枚のカードの弾種を書き換える。 */
+export function applyTargetShell(
+  targets: readonly Target[],
+  targetId: string,
+  shell: ShellCode,
+): Target[] {
+  return targets.map((t) => (t.id === targetId ? { ...t, shell } : t))
+}
+
+/**
+ * ある標定から出したカードすべての弾種を書き換える。
+ * 標定側で弾種を変えたとき、そこから送った射撃順のカードを追従させるために使う。
+ */
+export function applyOriginShell(
+  targets: readonly Target[],
+  fixId: string,
+  shell: ShellCode,
+): Target[] {
+  return targets.map((t) => (t.originFixId === fixId ? { ...t, shell } : t))
+}

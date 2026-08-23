@@ -1,5 +1,6 @@
 import { formatPoint, parseGrid } from '../lib/grid'
 import { SHALLOW_CROSSING_DEG, firingSolutionFrom } from '../lib/triangulate'
+import { DEFAULT_SHELL, SHELLS } from '../lib/shells'
 import type { Point } from '../lib/grid'
 import type { Fix, KnownPoint, ResolvedFix, Sighting } from '../lib/survey'
 import type { Measurement, Target } from '../lib/targets'
@@ -15,10 +16,14 @@ interface Props {
   onAddSighting: () => void
   onRemoveSighting: (sightingId: string) => void
   onRemove: () => void
+  /** 片づけに巻き込めない標定か（isFixDurable）。✕ を押しても消えないことを伝える。 */
+  durable: boolean
   onAddTarget: (measurement: Measurement, origin?: TargetOrigin) => void
   onToggleReference: () => void
   onToggleTarget: () => void
   onPinnedGrid: (gridInput: string) => void
+  /** 弾種の変更。紐づく射撃順のカードがあれば、そちらの弾種も合わせて変わる。 */
+  onShell: (code: string) => void
   /** この標定から出した射撃順のカード。状態をここに映す。 */
   linked: readonly Target[]
 }
@@ -35,10 +40,12 @@ export function FixCard({
   onAddSighting,
   onRemoveSighting,
   onRemove,
+  durable,
   onAddTarget,
   onToggleReference,
   onToggleTarget,
   onPinnedGrid,
+  onShell,
   linked,
 }: Props) {
   const { fix, status } = resolved
@@ -85,6 +92,15 @@ export function FixCard({
     !resolved.pinned &&
     linked.some((t) => t.outcome === 'miss') &&
     resolved.alternative === null
+  /**
+   * ✕ を押しても消えないなら、その理由を title で伝える。
+   * 実測座標を持つ場合と、他の標定の観測元になっている場合とで直し方が違うので分けて出す。
+   */
+  const removeTitle = !durable
+    ? `${fix.label} を削除`
+    : resolved.pinned
+      ? '基準点として残ります。消すには基準点の欄で ↺ を押して実測を取り消してください'
+      : '他の標定の観測元になっているため残ります。射撃順のカードだけ削除します'
 
   return (
     <article className={`fix${position !== null ? ' is-solved' : ''}`}>
@@ -103,10 +119,30 @@ export function FixCard({
           <Badges states={stateOf(1)} />
         </span>
 
-        <button className="fix__remove" onClick={onRemove} aria-label={`${fix.label} を削除`}>
+        <button
+          className="fix__remove"
+          onClick={onRemove}
+          title={removeTitle}
+          aria-label={`${fix.label} を削除`}
+        >
           ✕
         </button>
       </header>
+
+      <label className="fix__shell">
+        <span className="fix__k">弾種</span>
+        <select
+          value={fix.shell ?? DEFAULT_SHELL}
+          onChange={(e) => onShell(e.target.value)}
+          aria-label="弾種"
+        >
+          {SHELLS.map((s) => (
+            <option key={s.code} value={s.code}>
+              {s.code} — {s.jp}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {/*
         観測基準点は撃って確かめられる。当たればそこにいると分かるので、

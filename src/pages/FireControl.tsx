@@ -1,6 +1,6 @@
 import { FiringPlan } from '../components/FiringPlan'
 import { TargetIntake } from '../components/TargetIntake'
-import { isShellCode } from '../lib/shells'
+import { isShellCode, type ShellCode } from '../lib/shells'
 import type {
   ChargeSetting,
   FiringPlan as Plan,
@@ -14,6 +14,8 @@ interface Props {
   targetCount: number
   onAdd: (measurements: Measurement[]) => void
   onPatch: (id: string, change: Partial<Target>) => void
+  /** 弾種の変更。紐づく標定があれば、そちらの弾種も合わせて変わる。 */
+  onShell: (id: string, shell: ShellCode) => void
   onToggleDone: (id: string) => void
   onReportOutcome: (id: string, outcome: 'hit' | 'miss') => void
   onReportMiss: (id: string) => void
@@ -28,6 +30,7 @@ export function FireControl({
   targetCount,
   onAdd,
   onPatch,
+  onShell,
   onToggleDone,
   onReportOutcome,
   onReportMiss,
@@ -42,7 +45,7 @@ export function FireControl({
 
       <FiringPlan
         plan={plan}
-        onShell={(id, code) => isShellCode(code) && onPatch(id, { shell: code })}
+        onShell={(id, code) => isShellCode(code) && onShell(id, code)}
         onCharge={(id, charge: ChargeSetting) => onPatch(id, { charge })}
         onGun={(id, gun: GunSetting) => onPatch(id, { gun })}
         onImpact={(id, impactDigits) => onPatch(id, { impactDigits })}

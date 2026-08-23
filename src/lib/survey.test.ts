@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { bearingBetween, distanceBetween, formatPoint, gridToPoint, parseGrid } from './grid'
 import {
   NEST_FIX_ID,
+  applyFixShell,
   availableSources,
+  defaultShellFor,
   isAutoLabel,
   isFixDurable,
   labelForRole,
   nextReferenceLabel,
   nextTargetLabel,
+  removeFixIfRemovable,
   settledFixes,
   solveSurvey,
   trackedPoint,
@@ -494,6 +497,60 @@ describe('片づけに巻き込んでよいか', () => {
 
   it('存在しない標定は守らない', () => {
     expect(isFixDurable({ known: [], fixes: [] }, 'nope')).toBe(false)
+  })
+})
+
+describe('標定を削除', () => {
+  it('片づけてよい標定はそのまま消える', () => {
+    const doc: SurveyDoc = { known: [], fixes: [fix('t', [])] }
+    const next = removeFixIfRemovable(doc, 't')
+    expect(next.fixes.map((f) => f.id)).toEqual([])
+  })
+
+  it('実測座標を持つ標定は消えない。基準点の情報が消えてしまうため', () => {
+    const doc: SurveyDoc = { known: [], fixes: [fix('t', [], { pinnedGrid: 'H5 2:2' })] }
+    const next = removeFixIfRemovable(doc, 't')
+    expect(next).toBe(doc) // 変更が要らないので同じ参照のまま返る
+    expect(next.fixes.map((f) => f.id)).toEqual(['t'])
+  })
+
+  it('他の標定の観測元になっている標定も消えない。消すと連鎖が切れるため', () => {
+    const doc: SurveyDoc = {
+      known: [],
+      fixes: [fix('ref', []), fix('t', [sighting('ref', '90')])],
+    }
+    const next = removeFixIfRemovable(doc, 'ref')
+    expect(next.fixes.map((f) => f.id)).toEqual(['ref', 't'])
+  })
+
+  it('実測座標を取り消せば、以後は普通に消せる', () => {
+    const doc: SurveyDoc = { known: [], fixes: [fix('t', [], { pinnedGrid: 'H5 2:2' })] }
+    const released: SurveyDoc = {
+      ...doc,
+      fixes: doc.fixes.map((f) => ({ ...f, pinnedGrid: undefined })),
+    }
+    expect(removeFixIfRemovable(released, 't').fixes).toEqual([])
+  })
+})
+
+describe('弾種', () => {
+  it('未設定なら既定弾（HE）', () => {
+    expect(defaultShellFor(fix('t', []))).toBe('HE')
+    expect(defaultShellFor(undefined)).toBe('HE')
+  })
+
+  it('標定に設定されていればそれを使う', () => {
+    expect(defaultShellFor(fix('t', [], { shell: 'AP' }))).toBe('AP')
+  })
+
+  it('標定の弾種を書き換える。他の標定はそのまま', () => {
+    const doc: SurveyDoc = {
+      known: [],
+      fixes: [fix('a', [], { shell: 'HE' }), fix('b', [], { shell: 'HE' })],
+    }
+    const next = applyFixShell(doc, 'a', 'AP')
+    expect(next.fixes.find((f) => f.id === 'a')?.shell).toBe('AP')
+    expect(next.fixes.find((f) => f.id === 'b')?.shell).toBe('HE')
   })
 })
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyOriginShell,
+  applyTargetShell,
   buildPlan,
   newTarget,
   parseBearing,
@@ -630,5 +632,34 @@ describe('砲座が動いたとき', () => {
     const round = reprojectTarget(reprojectTarget(target, nestA, nestB), nestB, nestA)
     expect(round.bearingDeg).toBeCloseTo(target.bearingDeg, 6)
     expect(round.distanceKm).toBeCloseTo(target.distanceKm, 9)
+  })
+})
+
+describe('弾種の同期', () => {
+  it('弾種を変えても他のカードは変わらない', () => {
+    const a = at(90, 5, { id: 'a', shell: 'HE' })
+    const b = at(180, 5, { id: 'b', shell: 'HE' })
+    const next = applyTargetShell([a, b], 'a', 'AP')
+    expect(next.find((t) => t.id === 'a')?.shell).toBe('AP')
+    expect(next.find((t) => t.id === 'b')?.shell).toBe('HE')
+  })
+
+  it('id が無ければ何も変わらない', () => {
+    const a = at(90, 5, { id: 'a', shell: 'HE' })
+    const next = applyTargetShell([a], 'nope', 'AP')
+    expect(next).toEqual([a])
+  })
+
+  it('同じ標定から出したカードだけ弾種が揃う', () => {
+    const a = at(90, 5, { id: 'a', originFixId: 'f1', shell: 'HE' })
+    const b = at(180, 5, { id: 'b', originFixId: 'f1', shell: 'HE' })
+    const c = at(0, 5, { id: 'c', originFixId: 'f2', shell: 'HE' })
+    const manual = at(45, 5, { id: 'd', shell: 'HE' }) // 標定を経ずに手で足したカード
+
+    const next = applyOriginShell([a, b, c, manual], 'f1', 'AP')
+    expect(next.find((t) => t.id === 'a')?.shell).toBe('AP')
+    expect(next.find((t) => t.id === 'b')?.shell).toBe('AP')
+    expect(next.find((t) => t.id === 'c')?.shell).toBe('HE')
+    expect(next.find((t) => t.id === 'd')?.shell).toBe('HE')
   })
 })
