@@ -1266,22 +1266,6 @@ code {
   background: var(--panel-2);
 }
 
-.fix__adopt {
-  background: none;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--muted);
-  padding: 5px 12px;
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.fix__adopt:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 /* ---------- 目標の取り込み ---------- */
 /* もう一方の候補。撃って確かめるための行 */
 .fix__alt {
@@ -1321,22 +1305,6 @@ code {
 .fix__try:hover {
   border-color: var(--accent);
   background: var(--panel-2);
-}
-
-.fix__adopt {
-  background: none;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--muted);
-  padding: 5px 12px;
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.fix__adopt:hover {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 /* ---------- 目標の取り込み ---------- */

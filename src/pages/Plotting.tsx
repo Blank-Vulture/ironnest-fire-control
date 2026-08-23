@@ -327,7 +327,6 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
                 onChange({ ...doc, fixes: doc.fixes.filter((f) => f.id !== resolved.fix.id) })
               }
               onAddTarget={onAddTarget}
-              onAdoptAsNest={() => adoptAsNest(resolved.fix.id)}
             />
           ))}
         </div>
@@ -354,9 +353,9 @@ export function Plotting({ doc, onChange, onAddTarget }: Props) {
           段を重ねるほど最終的な誤差は大きくなるので、累積ぶんの表示を見ながら組んでください。
         </p>
         <p>
-          緊急移動で自機の位置が分からなくなったら、補給隊の位置報告を観測にして
-          <strong>IRON NEST 自身を標定</strong>し、<strong>現在地にする</strong>を押してください。
-          砲座の座標が書き換わり、以降の射撃諸元がその位置で計算されます。
+          緊急移動で自機の位置が分からなくなったら、上の <strong>IRON NEST</strong> の区画で
+          <strong>座標を更新</strong>を押してください。補給隊を呼ぶ先が決まるので、
+          戻ってきた報告を入れれば現在地が出ます。
         </p>
       </footer>
     </>

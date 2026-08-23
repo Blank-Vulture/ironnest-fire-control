@@ -15,8 +15,6 @@ interface Props {
   onRemoveSighting: (sightingId: string) => void
   onRemove: () => void
   onAddTarget: (measurement: Measurement) => void
-  /** この点を IRON NEST の現在地として採用する。 */
-  onAdoptAsNest: () => void
 }
 
 /** m 単位に丸めて出す。km で出すと桁が読みづらい。 */
@@ -32,7 +30,6 @@ export function FixCard({
   onRemoveSighting,
   onRemove,
   onAddTarget,
-  onAdoptAsNest,
 }: Props) {
   const { fix, status } = resolved
   const position = status.kind === 'solved' ? status.position : null
@@ -170,13 +167,6 @@ export function FixCard({
             <span className="fix__k">IRON NEST の位置を入れると射撃諸元が出ます</span>
           )}
 
-          <button
-            className="fix__adopt"
-            onClick={onAdoptAsNest}
-            title="緊急移動のあとなど、この点を自機の現在地として採用する"
-          >
-            現在地にする
-          </button>
           {solution !== null && (
             <button
               className="fix__use"
