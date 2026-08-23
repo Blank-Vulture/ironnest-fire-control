@@ -1297,6 +1297,97 @@ code {
   background: #f0b64a;
 }
 
+/* ---------- 元に戻す ---------- */
+
+.tabs__undo {
+  margin-left: auto;
+  align-self: center;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  padding: 6px 13px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.tabs__undo:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- 観測員の生存 ---------- */
+
+.known__alive {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.known__alive:hover {
+  color: var(--text);
+}
+
+.known__alive.is-lost {
+  color: var(--danger);
+}
+
+/* 撃破された観測員。過去の報告は生きているので、消さずに沈めるだけ */
+.known__row.is-lost {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+/* ---------- 実測座標 ---------- */
+
+.fix__measured {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+
+.fix__measured.is-pinned {
+  border-color: var(--accent-dim);
+}
+
+.fix__measured input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.fix__measured input::placeholder {
+  color: #4a5361;
+  font-family: var(--sans);
+  font-size: 11px;
+}
+
+.fix__measured input.is-invalid {
+  color: var(--danger);
+}
+
+.fix__badge.is-measured {
+  color: var(--accent);
+}
+
 /* ---------- 標定の役割と、射撃順での状態 ---------- */
 
 .fix__roles {
@@ -1405,6 +1496,97 @@ code {
 }
 
 /* ---------- 目標の取り込み ---------- */
+/* ---------- 元に戻す ---------- */
+
+.tabs__undo {
+  margin-left: auto;
+  align-self: center;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  padding: 6px 13px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.tabs__undo:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- 観測員の生存 ---------- */
+
+.known__alive {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.known__alive:hover {
+  color: var(--text);
+}
+
+.known__alive.is-lost {
+  color: var(--danger);
+}
+
+/* 撃破された観測員。過去の報告は生きているので、消さずに沈めるだけ */
+.known__row.is-lost {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+/* ---------- 実測座標 ---------- */
+
+.fix__measured {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+
+.fix__measured.is-pinned {
+  border-color: var(--accent-dim);
+}
+
+.fix__measured input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.fix__measured input::placeholder {
+  color: #4a5361;
+  font-family: var(--sans);
+  font-size: 11px;
+}
+
+.fix__measured input.is-invalid {
+  color: var(--danger);
+}
+
+.fix__badge.is-measured {
+  color: var(--accent);
+}
+
 /* ---------- 標定の役割と、射撃順での状態 ---------- */
 
 .fix__roles {
@@ -2532,6 +2714,11 @@ code {
 
 .plan__done li button:last-child:hover {
   color: var(--danger);
+}
+
+/* 確認射撃のカード。普通の攻撃と取り違えないよう縁で見分ける */
+.card.is-verifying {
+  border-top: 3px solid var(--ink);
 }
 
 /* ---------- 確認射撃の結果 ---------- */

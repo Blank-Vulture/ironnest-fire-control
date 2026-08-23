@@ -16,6 +16,7 @@ interface Props {
   onPatch: (id: string, change: Partial<Target>) => void
   onToggleDone: (id: string) => void
   onReportOutcome: (id: string, outcome: 'hit' | 'miss') => void
+  verifyFixIds: ReadonlySet<string>
   onRemove: (id: string) => void
   onClear: () => void
 }
@@ -27,6 +28,7 @@ export function FireControl({
   onPatch,
   onToggleDone,
   onReportOutcome,
+  verifyFixIds,
   onRemove,
   onClear,
 }: Props) {
@@ -42,6 +44,7 @@ export function FireControl({
         onImpact={(id, impactDigits) => onPatch(id, { impactDigits })}
         onToggleDone={onToggleDone}
         onReportOutcome={onReportOutcome}
+        verifyFixIds={verifyFixIds}
         onRemove={onRemove}
       />
 

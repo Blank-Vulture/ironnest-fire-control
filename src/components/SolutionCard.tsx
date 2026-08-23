@@ -13,6 +13,8 @@ interface Props {
   onImpact: (digits: string) => void
   onToggleDone: () => void
   onReportOutcome: (outcome: 'hit' | 'miss') => void
+  /** 観測基準点への射撃か。普通の攻撃と確認射撃を見分けるため。 */
+  verifying: boolean
   onRemove: () => void
 }
 
@@ -29,6 +31,7 @@ export function SolutionCard({
   onImpact,
   onToggleDone,
   onReportOutcome,
+  verifying,
   onRemove,
 }: Props) {
   const { solution, order, gun } = step
@@ -38,7 +41,11 @@ export function SolutionCard({
   const unreachable = solution.charge === null
 
   return (
-    <article className={`card card--${gun}${unreachable ? ' is-unreachable' : ''}`}>
+    <article
+      className={`card card--${gun}${unreachable ? ' is-unreachable' : ''}${
+        verifying ? ' is-verifying' : ''
+      }`}
+    >
       <header className="card__head">
         <span className="card__order" title="射撃順">
           {order}
@@ -175,11 +182,11 @@ export function SolutionCard({
         候補が 2 つあるうちの片方を撃つカード。当たったか外れたかが分かれば、
         標定の候補はそこで 1 つに決まる。
       */}
-      {target.candidate !== undefined && (
+      {verifying && (
         <div className="card__probe">
           {/* 候補は確定すると入れ替わるので、番号で呼ばない。
               「撃った結果どうだったか」だけを聞く。 */}
-          <span className="card__k">確認射撃</span>
+          <span className="card__k">確認射撃 · 観測基準点</span>
           <div className="card__outcome" role="group" aria-label="射撃の結果">
             <button
               className={`card__hit${target.outcome === 'hit' ? ' is-on' : ''}`}
@@ -199,8 +206,8 @@ export function SolutionCard({
           {target.outcome !== undefined && (
             <span className="card__verdict">
               {target.outcome === 'hit'
-                ? 'この位置で確定しました'
-                : '外れ — もう一方が本命として確定しました'}
+                ? 'この位置を実測座標として確定しました'
+                : '外れ — 標定側で座標を入れ直してください'}
             </span>
           )}
         </div>

@@ -37,6 +37,8 @@ interface Props {
   onRemoveFix: (fixId: string) => void
   /** 砲座が動いたことを伝える。射撃順の目標を新しい位置から測り直すため。 */
   onNestMoved: (from: Point, to: Point) => void
+  /** 元に戻せるよう、構造を動かす操作の前に呼ぶ。 */
+  onRemember: (label: string) => void
 }
 
 const id = (prefix: string) =>
@@ -92,6 +94,7 @@ export function Plotting({
   onAddTarget,
   onRemoveFix,
   onNestMoved,
+  onRemember,
 }: Props) {
   const [pasteError, setPasteError] = useState<string[]>([])
   const [highlight, setHighlight] = useState<string | null>(null)
@@ -146,6 +149,7 @@ export function Plotting({
     const grid = formatPoint(resolved.status.position)
     if (grid === null) return
 
+    onRemember('IRON NEST の座標を更新')
     const before = survey.nest
     const after = resolved.status.position
     if (before !== null) onNestMoved(before, after)
@@ -167,6 +171,7 @@ export function Plotting({
   const requestConvoys = () => {
     const nest = doc.known.find((k) => k.isNest)
     if (nest === undefined) return
+    onRemember('補給隊への要請')
 
     const ref = parseGrid(nest.gridInput)
     const lastKnown = ref !== null
@@ -220,6 +225,7 @@ export function Plotting({
   /** 位置報告の要請を片付ける。補給隊とその標定を消す。 */
   const cancelConvoys = () => {
     if (nest === undefined) return
+    onRemember('補給隊の要請を片付け')
     onChange({
       known: doc.known.filter((k) => k.parentId !== nest.id),
       fixes: doc.fixes.filter((f) => f.id !== NEST_FIX_ID),
@@ -281,13 +287,22 @@ export function Plotting({
             return (
               <li
                 key={point.id}
-                className="known__row"
+                className={`known__row${point.lost === true ? ' is-lost' : ''}`}
                 onMouseEnter={() => setHighlight(point.id)}
                 onMouseLeave={() => setHighlight((h) => (h === point.id ? null : h))}
               >
-                <span className="known__mark" aria-hidden>
-                  ○
-                </span>
+                <button
+                  className={`known__alive${point.lost === true ? ' is-lost' : ''}`}
+                  onClick={() => patchKnown(point.id, { lost: point.lost !== true })}
+                  title={
+                    point.lost === true
+                      ? '撃破された扱い。押すと健在に戻します'
+                      : '健在。押すと撃破された扱いにします'
+                  }
+                  aria-pressed={point.lost === true}
+                >
+                  {point.lost === true ? '✕' : '○'}
+                </button>
                 <input
                   className="known__label"
                   value={point.label}
@@ -308,9 +323,10 @@ export function Plotting({
                 />
                 <button
                   className="known__remove"
-                  onClick={() =>
+                  onClick={() => {
+                    onRemember('観測員を削除')
                     onChange({ ...doc, known: doc.known.filter((k) => k.id !== point.id) })
-                  }
+                  }}
                   title="削除"
                   aria-label={`${point.label} を削除`}
                 >
@@ -378,6 +394,7 @@ export function Plotting({
               onToggleTarget={() =>
                 patchFix(resolved.fix.id, { isTarget: !resolved.fix.isTarget })
               }
+              onPinnedGrid={(pinnedGrid) => patchFix(resolved.fix.id, { pinnedGrid })}
               linked={targets.filter((t) => t.originFixId === resolved.fix.id)}
             />
           ))}

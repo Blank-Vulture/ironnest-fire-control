@@ -21,6 +21,8 @@ interface Props {
   onImpact: (id: string, digits: string) => void
   onToggleDone: (id: string) => void
   onReportOutcome: (id: string, outcome: 'hit' | 'miss') => void
+  /** 観測基準点になっている標定の id。そこへの射撃だけ確認射撃として扱う。 */
+  verifyFixIds: ReadonlySet<string>
   onRemove: (id: string) => void
 }
 
@@ -53,6 +55,7 @@ export function FiringPlan({
   onImpact,
   onToggleDone,
   onReportOutcome,
+  verifyFixIds,
   onRemove,
 }: Props) {
   const { steps, totalTurnDeg, unplaced, done } = plan
@@ -80,6 +83,10 @@ export function FiringPlan({
             onImpact={(digits) => onImpact(step.solution.target.id, digits)}
             onToggleDone={() => onToggleDone(step.solution.target.id)}
             onReportOutcome={(outcome) => onReportOutcome(step.solution.target.id, outcome)}
+            verifying={
+              step.solution.target.originFixId !== undefined &&
+              verifyFixIds.has(step.solution.target.originFixId)
+            }
             onRemove={() => onRemove(step.solution.target.id)}
           />
         </>

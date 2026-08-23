@@ -37,6 +37,11 @@ export interface KnownPoint {
   isNest: boolean
   /** 別の点にぶら下げて見せるとき、その親。補給隊を IRON NEST の下に置く。 */
   parentId?: PointId
+  /**
+   * 撃破された。これから新しい報告はもらえないので観測元の選択肢から外す。
+   * すでに受け取っている報告は、撃破される前のものなのでそのまま使える。
+   */
+  lost?: boolean
 }
 
 /** ある点から見た報告。方位だけ・距離だけ・両方のどれでもよい。 */
@@ -67,6 +72,14 @@ export interface Fix {
    * 片方へ撃った結果（命中・不発）が分かれば確定できる。
    */
   chosen?: 1 | 2
+  /**
+   * 実測で確かめた座標。
+   *
+   * 観測基準点は撃って確かめられる。当たればそこにいると分かるので、
+   * 推定値ではなく実測値になる。ずれていたと分かったときも、ここを
+   * 書き換えれば直せる。入っている間は三角測量より優先し、誤差は 0 として扱う。
+   */
+  pinnedGrid?: string
 }
 
 export interface SurveyDoc {
@@ -84,6 +97,8 @@ export type FixStatus =
 export interface ResolvedFix {
   fix: Fix
   status: FixStatus
+  /** 実測座標で確定しているか。三角測量の結果ではない。 */
+  pinned: boolean
   /** この点自身の推定に伴う食い違い（km）。 */
   residualKm: number
   /**
@@ -120,6 +135,7 @@ export function labelOf(doc: SurveyDoc, id: PointId): string {
  * その標定点が観測元にできる点の一覧。
  *
  * 自分自身と、自分を辿ってくる点は輪になるので外す。
+ * 撃破された観測員は、これから新しい報告をくれないので外す。
  * 観測基準点として使う印が付いた標定点だけを出す。
  * 補給隊は自機の位置を割り出すためだけの臨時の点なので、目標の観測元には出さない。
  * 自機の現在地を割り出している点も、砲座そのものと同じなので重複させない。
@@ -139,7 +155,7 @@ export function availableSources(doc: SurveyDoc, fixId: PointId): (KnownPoint | 
     }
   }
   return [
-    ...doc.known.filter((k) => k.parentId === undefined),
+    ...doc.known.filter((k) => k.parentId === undefined && k.lost !== true),
     ...doc.fixes.filter(
       (f) => f.isReference && !dependents.has(f.id) && f.id !== NEST_FIX_ID,
     ),
@@ -188,6 +204,7 @@ function fromTriangulation(
     return {
       fix,
       status: result,
+      pinned: false,
       residualKm: 0,
       accumulatedKm: 0,
       chained,
@@ -208,6 +225,7 @@ function fromTriangulation(
   return {
     fix,
     status: { kind: 'solved', position, residualKm: estimate.residualKm },
+    pinned: false,
     residualKm: estimate.residualKm,
     // 観測元がすでに推定値なら、その不確かさはそのまま持ち越される
     accumulatedKm: estimate.residualKm + sourceUncertainty,
@@ -237,6 +255,26 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
 
     for (const fix of doc.fixes) {
       if (resolved.has(fix.id)) continue
+
+      // 実測で確かめた座標があるなら、観測を待たずにそこで確定する
+      const measured = fix.pinnedGrid === undefined ? null : parseGrid(fix.pinnedGrid)
+      if (measured !== null) {
+        const position = gridToPoint(measured)
+        resolved.set(fix.id, {
+          fix,
+          status: { kind: 'solved', position, residualKm: 0 },
+          pinned: true,
+          residualKm: 0,
+          accumulatedKm: 0,
+          chained: false,
+          alternative: null,
+          crossingAngleDeg: null,
+        })
+        positions.set(fix.id, position)
+        uncertainty.set(fix.id, 0)
+        progressed = true
+        continue
+      }
 
       const { observations, missing } = toObservations(fix.sightings, positions)
       if (missing.length > 0) continue // まだ観測元が揃っていない。次の周回で拾う
@@ -274,6 +312,7 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
     resolved.set(fix.id, {
       fix,
       status: { kind: 'pending', missing },
+      pinned: false,
       residualKm: 0,
       accumulatedKm: 0,
       chained: true,
@@ -289,4 +328,18 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
     fixes: doc.fixes.map((f) => resolved.get(f.id)!),
     nest: nestId === undefined ? null : (positions.get(nestId) ?? null),
   }
+}
+
+/**
+ * その射撃順のカードが追いかけるべき点。
+ *
+ * 候補が 2 つあるうちは、カードが指している方を追う。確定したり実測座標が
+ * 入ったりして候補が 1 つになったら、番号で分ける意味が無くなるので
+ * すべて本命を追う。ここを分けておかないと、外れた確認射撃のカードが
+ * 参照先を失って、座標を直しても古い値のまま取り残される。
+ */
+export function trackedPoint(resolved: ResolvedFix, candidate: 1 | 2 | undefined): Point | null {
+  if (resolved.status.kind !== 'solved') return null
+  if (resolved.alternative === null) return resolved.status.position
+  return candidate === 2 ? resolved.alternative : resolved.status.position
 }

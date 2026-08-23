@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ROUTES, ROUTE_TITLE, useHashRoute } from './lib/route'
 import { emptySurveyDoc, Plotting } from './pages/Plotting'
 import { FireControl } from './pages/FireControl'
-import { solveSurvey, type Fix, type SurveyDoc } from './lib/survey'
+import { solveSurvey, trackedPoint, type Fix, type SurveyDoc } from './lib/survey'
 import { firingSolutionFrom } from './lib/triangulate'
-import type { Point } from './lib/grid'
+import { formatPoint, pointFrom, type Point } from './lib/grid'
 import {
   buildPlan,
   newTarget,
@@ -69,10 +69,56 @@ function loadSurvey(): SurveyDoc {
   }
 }
 
+/** 元に戻せる 1 手。消す操作は連鎖するので、両方まとめて覚えておく。 */
+interface Snapshot {
+  label: string
+  targets: Target[]
+  doc: SurveyDoc
+}
+
+const UNDO_DEPTH = 20
+
 export function App() {
   const [route, go] = useHashRoute()
   const [targets, setTargets] = useState<Target[]>(loadTargets)
   const [doc, setDoc] = useState<SurveyDoc>(loadSurvey)
+  const [undoStack, setUndoStack] = useState<Snapshot[]>([])
+
+  /**
+   * 取り返しのつく形にしておく。
+   *
+   * 標定とカードは互いに消し合うので、1 回の誤操作で両方まとめて消える。
+   * 文字の打ち直しは入力欄が面倒を見るので、ここで覚えるのは
+   * 消す・畳む・座標を書き換えるといった構造を動かす操作だけにする。
+   */
+  const remember = useCallback(
+    (label: string) =>
+      setUndoStack((stack) => [...stack.slice(-(UNDO_DEPTH - 1)), { label, targets, doc }]),
+    [targets, doc],
+  )
+
+  const undo = useCallback(() => {
+    setUndoStack((stack) => {
+      const last = stack[stack.length - 1]
+      if (last === undefined) return stack
+      setTargets(last.targets)
+      setDoc(last.doc)
+      return stack.slice(0, -1)
+    })
+  }, [])
+
+  // 入力欄の中では素の取り消しに任せる。こちらが横取りすると打ち直せない
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key !== 'z') return
+      const tag = (event.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      event.preventDefault()
+      undo()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo])
 
   useEffect(() => {
     try {
@@ -107,9 +153,9 @@ export function App() {
       const next = previous.map((target) => {
         if (target.originFixId === undefined || survey.nest === null) return target
         const resolved = survey.fixes.find((f) => f.fix.id === target.originFixId)
-        if (resolved === undefined || resolved.status.kind !== 'solved') return target
+        if (resolved === undefined) return target
 
-        const point = target.candidate === 2 ? resolved.alternative : resolved.status.position
+        const point = trackedPoint(resolved, target.candidate)
         if (point === null) return target
 
         const solution = firingSolutionFrom(survey.nest, point)
@@ -175,11 +221,21 @@ export function App() {
       setTargets((prev) => prev.map((t) => (t.id === targetId ? { ...t, outcome } : t)))
       if (target?.originFixId === undefined || target.candidate === undefined) return
 
+      // 当たったなら、そこにいると分かった。推定値ではなく実測値になる。
+      const hitGrid =
+        outcome === 'hit' && survey.nest !== null
+          ? formatPoint(pointFrom(survey.nest, target.bearingDeg, target.distanceKm))
+          : null
+
       const chosen: 1 | 2 =
         outcome === 'hit' ? target.candidate : target.candidate === 1 ? 2 : 1
       setDoc((prev) => ({
         ...prev,
-        fixes: prev.fixes.map((f) => (f.id === target.originFixId ? { ...f, chosen } : f)),
+        fixes: prev.fixes.map((f) =>
+          f.id !== target.originFixId
+            ? f
+            : { ...f, chosen, ...(hitGrid !== null ? { pinnedGrid: hitGrid } : {}) },
+        ),
       }))
 
       // 確定させると本命ともう一方が入れ替わる。カードの参照先もそれに合わせないと、
@@ -190,7 +246,7 @@ export function App() {
         ),
       )
     },
-    [targets],
+    [targets, survey],
   )
 
   /**
@@ -199,6 +255,7 @@ export function App() {
    */
   const removeTarget = useCallback(
     (id: string) => {
+      remember('カードを削除')
       const target = targets.find((t) => t.id === id)
       setTargets((prev) => prev.filter((t) => t.id !== id))
 
@@ -211,14 +268,18 @@ export function App() {
       if (usedAsSource || otherCards) return
       setDoc((prev) => ({ ...prev, fixes: prev.fixes.filter((f) => f.id !== fixId) }))
     },
-    [targets, doc],
+    [targets, doc, remember],
   )
 
   /** 標定を消したら、そこから出した射撃順のカードも消す。 */
-  const removeFix = useCallback((fixId: string) => {
-    setDoc((prev) => ({ ...prev, fixes: prev.fixes.filter((f) => f.id !== fixId) }))
-    setTargets((prev) => prev.filter((t) => t.originFixId !== fixId))
-  }, [])
+  const removeFix = useCallback(
+    (fixId: string) => {
+      remember('標定を削除')
+      setDoc((prev) => ({ ...prev, fixes: prev.fixes.filter((f) => f.id !== fixId) }))
+      setTargets((prev) => prev.filter((t) => t.originFixId !== fixId))
+    },
+    [remember],
+  )
 
   /**
    * 砲座が動いたら、標定と紐づいていない目標を測り直す。
@@ -232,7 +293,14 @@ export function App() {
     [],
   )
 
+  /** 観測基準点になっている標定。そこへの射撃だけ確認射撃として扱う。 */
+  const verifyFixIds = useMemo(
+    () => new Set(doc.fixes.filter((f) => f.isReference).map((f) => f.id)),
+    [doc],
+  )
+
   const title = ROUTE_TITLE[route]
+  const undoable = undoStack[undoStack.length - 1]
 
   return (
     <div className="app">
@@ -258,6 +326,12 @@ export function App() {
             )}
           </button>
         ))}
+
+        {undoable !== undefined && (
+          <button className="tabs__undo" onClick={undo} title="⌘Z / Ctrl+Z">
+            ↩ {undoable.label}
+          </button>
+        )}
       </nav>
 
       {route === 'plotting' ? (
@@ -269,6 +343,7 @@ export function App() {
           onAddTarget={sendToFireControl}
           onRemoveFix={removeFix}
           onNestMoved={reprojectLoose}
+          onRemember={remember}
         />
       ) : (
         <FireControl
@@ -278,8 +353,12 @@ export function App() {
           onPatch={patch}
           onToggleDone={toggleDone}
           onReportOutcome={reportOutcome}
+          verifyFixIds={verifyFixIds}
           onRemove={removeTarget}
-          onClear={() => setTargets([])}
+          onClear={() => {
+            remember('目標をすべて削除')
+            setTargets([])
+          }}
         />
       )}
     </div>

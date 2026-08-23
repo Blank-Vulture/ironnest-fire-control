@@ -1,4 +1,4 @@
-import { formatPoint } from '../lib/grid'
+import { formatPoint, parseGrid } from '../lib/grid'
 import { SHALLOW_CROSSING_DEG, firingSolutionFrom } from '../lib/triangulate'
 import type { Point } from '../lib/grid'
 import type { Fix, KnownPoint, ResolvedFix, Sighting } from '../lib/survey'
@@ -18,6 +18,7 @@ interface Props {
   onAddTarget: (measurement: Measurement, origin?: TargetOrigin) => void
   onToggleReference: () => void
   onToggleTarget: () => void
+  onPinnedGrid: (gridInput: string) => void
   /** この標定から出した射撃順のカード。状態をここに映す。 */
   linked: readonly Target[]
 }
@@ -37,10 +38,23 @@ export function FixCard({
   onAddTarget,
   onToggleReference,
   onToggleTarget,
+  onPinnedGrid,
   linked,
 }: Props) {
   const { fix, status } = resolved
-  const cardFor = (candidate: 1 | 2) => linked.find((t) => (t.candidate ?? 1) === candidate)
+  /**
+   * その候補に紐づくカード。追いかける点の決め方（trackedPoint）と揃える。
+   *
+   * 候補が 1 つしか無いときは番号で分ける意味が無いので、紐づいたカードは
+   * すべて本命側にまとめる。外れた確認射撃のカードは候補 2 を指したまま
+   * 残るので、そうしないと拾えなくなる。
+   */
+  const cardFor = (candidate: 1 | 2) =>
+    resolved.alternative === null
+      ? candidate === 1
+        ? linked[0]
+        : undefined
+      : linked.find((t) => (t.candidate ?? 1) === candidate)
   /**
    * 射撃順での様子。撃ち終えたかどうかと、当たったかどうかは別の話なので
    * 両方を並べる。
@@ -63,6 +77,14 @@ export function FixCard({
       : null
   const shallow =
     resolved.crossingAngleDeg !== null && resolved.crossingAngleDeg < SHALLOW_CROSSING_DEG
+  const badPin =
+    (fix.pinnedGrid ?? '') !== '' && parseGrid(fix.pinnedGrid ?? '') === null
+  // 外れた確認射撃があり、まだ実測座標が入っていない＝推定がずれたまま
+  const missedShot =
+    fix.isReference &&
+    !resolved.pinned &&
+    linked.some((t) => t.outcome === 'miss') &&
+    resolved.alternative === null
 
   return (
     <article className={`fix${position !== null ? ' is-solved' : ''}`}>
@@ -85,6 +107,33 @@ export function FixCard({
           ✕
         </button>
       </header>
+
+      {/*
+        観測基準点は撃って確かめられる。当たればそこにいると分かるので、
+        推定値ではなく実測値になる。外れたと分かったときもここを書き換えて直せる。
+      */}
+      {fix.isReference && (
+        <label className={`fix__measured${resolved.pinned ? ' is-pinned' : ''}`}>
+          <span className="fix__k">実測座標</span>
+          <input
+            value={fix.pinnedGrid ?? ''}
+            onChange={(e) => onPinnedGrid(e.target.value)}
+            placeholder="未確認（推定で運用）"
+            spellCheck={false}
+            autoComplete="off"
+            aria-label="実測で確かめた座標"
+            aria-invalid={badPin}
+            className={badPin ? 'is-invalid' : ''}
+          />
+          {resolved.pinned && <span className="fix__badge is-measured">実測</span>}
+        </label>
+      )}
+
+      {missedShot && (
+        <p className="fix__status is-warn">
+          確認射撃が外れました。推定がずれています。実測座標を入れ直すか、観測を足してください
+        </p>
+      )}
 
       {/* 撃つ相手なのか、他を測るための基準なのか。同じ点が両方を兼ねることもある */}
       <div className="fix__roles">

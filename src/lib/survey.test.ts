@@ -4,6 +4,7 @@ import {
   NEST_FIX_ID,
   availableSources,
   solveSurvey,
+  trackedPoint,
   type Fix,
   type KnownPoint,
   type Sighting,
@@ -343,5 +344,118 @@ describe('候補の確定', () => {
       ],
     }
     expect(formatPoint(solvedFix(solveSurvey(doc), 't').position)).toBe('F7 2:5')
+  })
+})
+
+describe('実測で確かめた座標', () => {
+  it('入っていれば三角測量より優先し、誤差 0 で確定する', () => {
+    const doc: SurveyDoc = {
+      known: [known('sp1', 'I9 9:1'), known('sp2', 'K4 3:7')],
+      fixes: [
+        fix(
+          'ref',
+          [
+            sighting('sp1', bearingTo('I9 9:1', 'F7 2:5')),
+            sighting('sp2', bearingTo('K4 3:7', 'F7 2:5')),
+          ],
+          { pinnedGrid: 'H5 0:0' },
+        ),
+      ],
+    }
+    const entry = solvedFix(solveSurvey(doc), 'ref')
+    expect(formatPoint(entry.position)).toBe('H5 0:0') // 観測が指す F7 2:5 ではない
+    expect(entry.pinned).toBe(true)
+    expect(entry.residualKm).toBe(0)
+    expect(entry.alternative).toBeNull()
+  })
+
+  it('観測がひとつも無くても確定する', () => {
+    const doc: SurveyDoc = {
+      known: [],
+      fixes: [fix('ref', [], { pinnedGrid: 'C3 4:5' })],
+    }
+    expect(formatPoint(solvedFix(solveSurvey(doc), 'ref').position)).toBe('C3 4:5')
+  })
+
+  it('確定した点を観測元にすると、誤差を持ち越さない', () => {
+    const ref = 'H5 0:0'
+    const target = 'J3 0:0'
+    const doc: SurveyDoc = {
+      known: [known('sp3', 'E2 2:4')],
+      fixes: [
+        fix('ref', [], { pinnedGrid: ref }),
+        fix('t', [
+          sighting('ref', bearingTo(ref, target)),
+          sighting('sp3', bearingTo('E2 2:4', target)),
+        ]),
+      ],
+    }
+    const entry = solvedFix(solveSurvey(doc), 't')
+    expect(formatPoint(entry.position)).toBe(target)
+    // 観測元が実測値なので、積み上がる誤差が無い
+    expect(entry.accumulatedKm).toBeLessThan(0.001)
+  })
+
+  it('読めない座標なら、これまでどおり三角測量で解く', () => {
+    const doc: SurveyDoc = {
+      known: [known('sp1', 'I9 9:1'), known('sp2', 'K4 3:7')],
+      fixes: [
+        fix(
+          'ref',
+          [
+            sighting('sp1', bearingTo('I9 9:1', 'F7 2:5')),
+            sighting('sp2', bearingTo('K4 3:7', 'F7 2:5')),
+          ],
+          { pinnedGrid: 'ZZ99' },
+        ),
+      ],
+    }
+    const entry = solvedFix(solveSurvey(doc), 'ref')
+    expect(entry.pinned).toBe(false)
+    expect(formatPoint(entry.position)).toBe('F7 2:5')
+  })
+})
+
+describe('カードが追いかける点', () => {
+  const target = at('F7 2:5')
+  const s1 = at('I9 9:1')
+  const s2 = at('K4 3:7')
+
+  const ambiguous = (patch: Partial<Fix> = {}): SurveyDoc => ({
+    known: [known('sp1', 'I9 9:1'), known('sp2', 'K4 3:7')],
+    fixes: [
+      fix(
+        't',
+        [
+          sighting('sp1', '', distanceBetween(s1, target).toFixed(4)),
+          sighting('sp2', '', distanceBetween(s2, target).toFixed(4)),
+        ],
+        patch,
+      ),
+    ],
+  })
+
+  const entry = (patch: Partial<Fix> = {}) =>
+    solveSurvey(ambiguous(patch)).fixes.find((f) => f.fix.id === 't')!
+
+  it('候補が 2 つあるうちは、指している方を追う', () => {
+    const e = entry()
+    expect(trackedPoint(e, 1)).toEqual(e.status.kind === 'solved' ? e.status.position : null)
+    expect(trackedPoint(e, 2)).toEqual(e.alternative)
+  })
+
+  it('候補が 1 つになったら、番号によらず本命を追う', () => {
+    // 実測座標が入れば候補は消える。候補 2 を指したままのカードも取り残さない
+    const e = entry({ pinnedGrid: 'H5 2:2' })
+    const pinned = e.status.kind === 'solved' ? e.status.position : null
+    expect(trackedPoint(e, 1)).toEqual(pinned)
+    expect(trackedPoint(e, 2)).toEqual(pinned)
+    expect(trackedPoint(e, undefined)).toEqual(pinned)
+  })
+
+  it('解けていなければ追いかけない', () => {
+    const doc: SurveyDoc = { known: [], fixes: [fix('t', [])] }
+    const unsolved = solveSurvey(doc).fixes[0]!
+    expect(trackedPoint(unsolved, 1)).toBeNull()
   })
 })
