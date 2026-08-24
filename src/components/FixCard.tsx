@@ -367,7 +367,7 @@ function FixStatusLine({ resolved, shallow }: { resolved: ResolvedFix; shallow: 
     <div className="fix__quality">
       <p className="fix__numbers">
         報告の食い違い ±{metres(resolved.residualKm)}
-        {resolved.chained && ` · 観測元のぶんを含めて ±${metres(resolved.accumulatedKm)}`}
+        {' · '}見込み誤差 ±{metres(resolved.accumulatedKm)}
         {resolved.crossingAngleDeg !== null &&
           ` · 交差角 ${resolved.crossingAngleDeg.toFixed(0)}°`}
       </p>

@@ -401,8 +401,36 @@ describe('実測で確かめた座標', () => {
     }
     const entry = solvedFix(solveSurvey(doc), 't')
     expect(formatPoint(entry.position)).toBe(target)
-    // 観測元が実測値なので、積み上がる誤差が無い
-    expect(entry.accumulatedKm).toBeLessThan(0.001)
+
+    // 実測で確定した点は、座標を直に入れた既知点と同じ扱いになる。
+    // 観測元として余分な誤差を足さない、というのがここで見たいこと。
+    // 誤差そのものはゼロにならない。報告の側に幅があるため。
+    const asKnown: SurveyDoc = {
+      known: [known('sp3', 'E2 2:4'), known('ref', ref)],
+      fixes: [
+        fix('t', [
+          sighting('ref', bearingTo(ref, target)),
+          sighting('sp3', bearingTo('E2 2:4', target)),
+        ]),
+      ],
+    }
+    expect(entry.accumulatedKm).toBeCloseTo(
+      solvedFix(solveSurvey(asKnown), 't').accumulatedKm,
+      6,
+    )
+  })
+
+  it('浅く交わって解いた点は、誤差を持ったまま次の観測元になる', () => {
+    // 方位 2 本はぴったり交わるので食い違いは 0 になる。それを誤差と見なすと、
+    // 数百 m ぶれている点を「正確な点」として次の標定に渡してしまう
+    // 交差角 15 度。実際に外れた射撃と同じ配置
+    const doc: SurveyDoc = {
+      known: [known('sp1', 'K2 6:5'), known('sp2', 'C5 3:7')],
+      fixes: [fix('mid', [sighting('sp1', '300'), sighting('sp2', '105')])],
+    }
+    const entry = solvedFix(solveSurvey(doc), 'mid')
+    expect(entry.residualKm).toBeLessThan(0.001) // 食い違いは無い
+    expect(entry.accumulatedKm).toBeGreaterThan(0.3) // それでも誤差は大きい
   })
 
   it('読めない座標なら、これまでどおり三角測量で解く', () => {

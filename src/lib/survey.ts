@@ -22,7 +22,7 @@ import {
   parseBearing,
   parseDistance,
 } from './targets'
-import { POSITION_SIGMA_KM } from './accuracy'
+import { estimateAccuracy, POSITION_SIGMA_KM } from './accuracy'
 import { triangulate, type Observation, type Triangulation } from './triangulate'
 
 export type PointId = string
@@ -210,6 +210,7 @@ function toObservations(
   positions: ReadonlyMap<PointId, Point>,
   nameOf: (id: PointId) => string,
   uncertainty: ReadonlyMap<PointId, number>,
+  gridEntered: ReadonlySet<PointId>,
 ): { observations: Observation[]; missing: PointId[] } {
   const observations: Observation[] = []
   const missing: PointId[] = []
@@ -234,11 +235,17 @@ function toObservations(
       // 入れた桁数がそのまま精度。小数まで読めているなら幅はその分せまい
       bearingSigmaDeg: bearingSigmaFor(sighting.bearingInput),
       rangeSigmaKm: distanceSigmaFor(sighting.rangeInput),
-      // 観測元の座標の幅。マスの ±50m は必ずあり、推定した点ならその誤差も乗る
-      positionSigmaKm: Math.max(
-        POSITION_SIGMA_KM,
-        uncertainty.get(sighting.fromId) ?? 0,
-      ),
+      // 観測元の座標の幅。
+      //
+      // マスで入れた点は、どう頑張っても 100m の幅がある。報告に載る座標が
+      // そこまでしか無いため。
+      //
+      // 一方、測って割り出した点はマスの幅に縛られない。地図で直接測った線から
+      // 割り出したなら、その線の精度がそのまま効く。ここに 100m の下限を
+      // かけると、丁寧に測っても報いが無くなる。
+      positionSigmaKm: gridEntered.has(sighting.fromId)
+        ? Math.max(POSITION_SIGMA_KM, uncertainty.get(sighting.fromId) ?? 0)
+        : (uncertainty.get(sighting.fromId) ?? POSITION_SIGMA_KM),
     })
   }
 
@@ -248,7 +255,6 @@ function toObservations(
 function fromTriangulation(
   fix: Fix,
   result: Triangulation,
-  sourceUncertainty: number,
   chained: boolean,
   observations: Observation[],
 ): ResolvedFix {
@@ -281,8 +287,12 @@ function fromTriangulation(
     observations,
     pinned: false,
     residualKm: estimate.residualKm,
-    // 観測元がすでに推定値なら、その不確かさはそのまま持ち越される
-    accumulatedKm: estimate.residualKm + sourceUncertainty,
+    // 実際の見込み誤差。食い違いだけで測ってはいけない。方位 2 本は必ず
+    // ぴったり交わるので食い違いは 0 になり、浅く交わって数百 m ぶれている
+    // 点まで「誤差 0 の点」として次の標定に渡してしまう。
+    // 観測元のぶんは observations の positionSigmaKm に入っているので、
+    // ここで足し直すと二重になる。
+    accumulatedKm: estimateAccuracy(observations, position).radiusKm,
     chained,
     alternative,
     crossingAngleDeg: estimate.crossingAngleDeg,
@@ -299,7 +309,12 @@ function fromTriangulation(
 export function solveSurvey(doc: SurveyDoc): SurveyResult {
   const positions = knownPositions(doc.known)
   const uncertainty = new Map<PointId, number>()
-  for (const id of positions.keys()) uncertainty.set(id, 0)
+  // マスで座標を入れた点。100m の幅が必ず付いて回る
+  const gridEntered = new Set<PointId>()
+  for (const id of positions.keys()) {
+    uncertainty.set(id, 0)
+    gridEntered.add(id)
+  }
 
   const resolved = new Map<PointId, ResolvedFix>()
   let progressed = true
@@ -327,6 +342,7 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
         })
         positions.set(fix.id, position)
         uncertainty.set(fix.id, 0)
+        gridEntered.add(fix.id) // 実測もマスで入れる以上、同じ幅を持つ
         progressed = true
         continue
       }
@@ -336,22 +352,17 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
         positions,
         (id) => labelOf(doc, id),
         uncertainty,
+        gridEntered,
       )
       if (missing.length > 0) continue // まだ観測元が揃っていない。次の周回で拾う
 
       const chained = fix.sightings.some(
         (s) => doc.fixes.some((f) => f.id === s.fromId) && positions.has(s.fromId),
       )
-      // 観測元が推定値なら、その不確かさを引き継ぐ。名前ではなく id で引く
-      const sourceUncertainty = fix.sightings.reduce(
-        (worst, sighting) => Math.max(worst, uncertainty.get(sighting.fromId) ?? 0),
-        0,
-      )
 
       const entry = fromTriangulation(
         fix,
         triangulate(observations),
-        sourceUncertainty,
         chained,
         observations,
       )
