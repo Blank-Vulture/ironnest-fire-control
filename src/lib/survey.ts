@@ -463,8 +463,23 @@ export function settledFixes(doc: SurveyDoc): Fix[] {
 
 /* ---------- 名前の自動付与 ---------- */
 
-const AUTO_TARGET = /^目標\s*(\d+)$/
-const AUTO_REFERENCE = /^基準点\s*([A-Z]|\d+)$/
+/**
+ * 基準点の呼び名。
+ *
+ * ゲーム内の報告が「Alpha からの方位角 300°」と読んでくるので、そのまま合わせる。
+ * 報告を見ながら観測元を選ぶとき、頭の中で Alpha と基準点 A を対応させ続けずに済む。
+ */
+const PHONETIC = [
+  'Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel',
+  'India', 'Juliett', 'Kilo', 'Lima', 'Mike', 'November', 'Oscar', 'Papa',
+  'Quebec', 'Romeo', 'Sierra', 'Tango', 'Uniform', 'Victor', 'Whiskey',
+  'X-ray', 'Yankee', 'Zulu',
+]
+
+const AUTO_TARGET = /^目標\s*#\s*(\d+)$/
+const AUTO_REFERENCE = new RegExp(`^(?:${PHONETIC.join('|')})$`, 'i')
+/** 呼び名を変える前に付けた名前。古い保存でも役割の付け替えが効くようにする。 */
+const AUTO_LEGACY = /^(?:基準点\s*(?:[A-Z]|\d+)|目標\s*\d+)$/
 
 /**
  * 自動で付けた名前か。
@@ -475,7 +490,11 @@ const AUTO_REFERENCE = /^基準点\s*([A-Z]|\d+)$/
  */
 export function isAutoLabel(label: string): boolean {
   const trimmed = label.trim()
-  return AUTO_TARGET.test(trimmed) || AUTO_REFERENCE.test(trimmed)
+  return (
+    AUTO_TARGET.test(trimmed) ||
+    AUTO_REFERENCE.test(trimmed) ||
+    AUTO_LEGACY.test(trimmed)
+  )
 }
 
 /** いま使われている名前。直接置いた基準点と標定の両方から集める。 */
@@ -490,23 +509,20 @@ function usedLabels(doc: SurveyDoc, exceptId?: PointId): Set<string> {
   return labels
 }
 
-const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-
 /**
  * まだ使われていない基準点の名前。
  *
- * ゲーム内の基準点トークンが A〜E なので、こちらも英字で振る。
  * 直接置いた基準点と、観測基準点に印を付けた標定は同じ並びを共有するので、
- * 番号が重ならないよう両方を見る。
+ * 名前が重ならないよう両方を見る。
  */
 export function nextReferenceLabel(doc: SurveyDoc, exceptId?: PointId): string {
   const used = usedLabels(doc, exceptId)
-  for (const letter of LETTERS) {
-    const candidate = `基準点 ${letter}`
-    if (!used.has(candidate)) return candidate
+  for (const name of PHONETIC) {
+    if (!used.has(name)) return name
   }
+  // ゲーム内のトークンは A〜E なので、ここまで来ることはまず無い
   for (let n = 1; ; n++) {
-    const candidate = `基準点 ${LETTERS.length + n}`
+    const candidate = `基準点#${PHONETIC.length + n}`
     if (!used.has(candidate)) return candidate
   }
 }
@@ -515,7 +531,7 @@ export function nextReferenceLabel(doc: SurveyDoc, exceptId?: PointId): string {
 export function nextTargetLabel(doc: SurveyDoc, exceptId?: PointId): string {
   const used = usedLabels(doc, exceptId)
   for (let n = 1; ; n++) {
-    const candidate = `目標 ${n}`
+    const candidate = `目標#${n}`
     if (!used.has(candidate)) return candidate
   }
 }

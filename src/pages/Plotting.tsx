@@ -53,7 +53,7 @@ const id = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 
 export function newKnownPoint(index: number): KnownPoint {
-  return { id: id('k'), label: `偵察兵 ${index}`, gridInput: '', isNest: false, kind: 'spotter' }
+  return { id: id('k'), label: `偵察兵#${index}`, gridInput: '', isNest: false, kind: 'spotter' }
 }
 
 export function newReferencePoint(doc: SurveyDoc): KnownPoint {
@@ -156,7 +156,7 @@ export function Plotting({
         },
         ...others.map((entry, i) => ({
           id: id('k'),
-          label: entry.label || `偵察兵 ${i + 1}`,
+          label: entry.label || `偵察兵#${i + 1}`,
           gridInput: formatEntryGrid(entry.grid),
           isNest: false,
           kind: 'spotter' as const,
