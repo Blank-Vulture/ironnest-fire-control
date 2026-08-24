@@ -16,7 +16,13 @@
 
 import { gridToPoint, parseGrid, type Point } from './grid'
 import { DEFAULT_SHELL, type ShellCode } from './shells'
-import { parseBearing, parseDistance } from './targets'
+import {
+  bearingSigmaFor,
+  distanceSigmaFor,
+  parseBearing,
+  parseDistance,
+} from './targets'
+import { POSITION_SIGMA_KM } from './accuracy'
 import { triangulate, type Observation, type Triangulation } from './triangulate'
 
 export type PointId = string
@@ -203,6 +209,7 @@ function toObservations(
   sightings: readonly Sighting[],
   positions: ReadonlyMap<PointId, Point>,
   nameOf: (id: PointId) => string,
+  uncertainty: ReadonlyMap<PointId, number>,
 ): { observations: Observation[]; missing: PointId[] } {
   const observations: Observation[] = []
   const missing: PointId[] = []
@@ -224,6 +231,14 @@ function toObservations(
       position,
       bearingDeg,
       rangeKm,
+      // 入れた桁数がそのまま精度。小数まで読めているなら幅はその分せまい
+      bearingSigmaDeg: bearingSigmaFor(sighting.bearingInput),
+      rangeSigmaKm: distanceSigmaFor(sighting.rangeInput),
+      // 観測元の座標の幅。マスの ±50m は必ずあり、推定した点ならその誤差も乗る
+      positionSigmaKm: Math.max(
+        POSITION_SIGMA_KM,
+        uncertainty.get(sighting.fromId) ?? 0,
+      ),
     })
   }
 
@@ -316,8 +331,11 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
         continue
       }
 
-      const { observations, missing } = toObservations(fix.sightings, positions, (id) =>
-        labelOf(doc, id),
+      const { observations, missing } = toObservations(
+        fix.sightings,
+        positions,
+        (id) => labelOf(doc, id),
+        uncertainty,
       )
       if (missing.length > 0) continue // まだ観測元が揃っていない。次の周回で拾う
 

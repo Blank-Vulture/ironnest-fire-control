@@ -11,8 +11,7 @@
 
 import { formatPoint, type Point } from './grid'
 import { shellByCode, type ShellCode } from './shells'
-import type { Accuracy } from './accuracy'
-import { prospect } from './accuracy'
+import { BEARING_SIGMA_DEG, type Accuracy, type Cause, prospect } from './accuracy'
 import type { Observation } from './triangulate'
 import { bearingBetween } from './grid'
 
@@ -69,6 +68,23 @@ export interface AdviceInput {
 /**
  * 見立てを組み立てる。効く順に並べる。
  */
+/** 誤差の出どころ。手の打ちようが違うので言い分ける。 */
+function causeLabel(cause: Cause): string {
+  if (cause === 'bearing') return '方位'
+  if (cause === 'range') return '距離'
+  return '座標'
+}
+
+/**
+ * 座標は 100m マスまでしか読めないので、報告を丁寧にしても縮まない。
+ * 打つ手が「角度の良い観測を足す」しかないことを言っておく。
+ */
+function causeNote(cause: Cause): string {
+  return cause === 'position'
+    ? '。座標は 100m マスまでしか読めないので、報告を丁寧にしても縮みません'
+    : ''
+}
+
 export function adviseFix(input: AdviceInput): Advice[] {
   const { position, alternative, accuracy, observations, shell } = input
   const advice: Advice[] = []
@@ -99,6 +115,7 @@ export function adviseFix(input: AdviceInput): Advice[] {
 
   const outlook = prospect(accuracy.radiusKm, effectRadiusKm)
 
+
   if (alternative === null && outlook === 'good') {
     advice.push({
       kind: 'ready',
@@ -120,8 +137,24 @@ export function adviseFix(input: AdviceInput): Advice[] {
       detail:
         `いまの視線に対して直角に近いので、同じ報告でも誤差がいちばん縮みます。` +
         (worst !== undefined
-          ? `いま効いているのは ${worst.label} の報告（±${metres(worst.shiftKm)}）です`
+          ? `いま効いているのは ${worst.label} の${causeLabel(worst.cause)}` +
+            `（±${metres(worst.shiftKm)}）です${causeNote(worst.cause)}`
           : ''),
+    })
+  }
+
+  // 方位を度単位で入れているなら、桁を増やすだけで幅が 10 分の 1 になる。
+  // 座標と違って手元で減らせるぶんなので、効いていなくても勧めておく
+  const roundedBearing = observations.some(
+    (o) => o.bearingDeg !== null && (o.bearingSigmaDeg ?? BEARING_SIGMA_DEG) >= 0.5,
+  )
+  if (roundedBearing) {
+    advice.push({
+      kind: 'observe',
+      headline: '方位を小数第 1 位まで入れる',
+      detail:
+        `方位を「300」と入れると丸めだけで ±0.5° の幅が出ます。` +
+        `ゲーム内で測った「300.0」のように小数まで入れると、幅は 10 分の 1 になります`,
     })
   }
 

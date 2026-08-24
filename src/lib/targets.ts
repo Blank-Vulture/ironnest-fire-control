@@ -153,6 +153,27 @@ export function parseBearing(input: string): number | null {
 }
 
 /**
+ * 入れた方位の読み取り幅（度）。
+ *
+ * 「300」なら丸めだけで ±0.5 度の幅があるが、「300.4」と小数まで読めているなら
+ * 幅は ±0.05 度しかない。入れた桁数がそのまま精度なので、そう受け取る。
+ * 浅く交わる標定では、この差がそのまま数百 m の差になる。
+ */
+function decimalSigma(input: string): number {
+  const decimals = /\.(\d+)$/.exec(numeric(input))?.[1] ?? ''
+  return 0.5 * Math.pow(10, -decimals.length)
+}
+
+export function bearingSigmaFor(input: string): number {
+  return decimalSigma(input)
+}
+
+/** 入れた距離の読み取り幅（km）。理屈は方位と同じ。 */
+export function distanceSigmaFor(input: string): number {
+  return decimalSigma(input)
+}
+
+/**
  * 射程（km）。km が付いていても落とす。正の値のみ有効。
  * 30 km を超えていても読む（射程外として一覧に出したいため）。
  */

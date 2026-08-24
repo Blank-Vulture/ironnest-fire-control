@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   applyOriginShell,
   applyTargetShell,
+  bearingSigmaFor,
   buildPlan,
+  distanceSigmaFor,
   newTarget,
+  pairSteps,
   parseBearing,
   parseDistance,
   parseMeasurement,
-  pairSteps,
   parseMeasurements,
   reprojectTarget,
   resupplyQueue,
@@ -703,5 +705,25 @@ describe('射撃順の番号', () => {
       ),
     )
     expect(plan.steps.map((s) => s.order)).toEqual([3, 4])
+  })
+})
+
+describe('方位の読み取り幅', () => {
+  it('度単位で入れたら丸めぶんの ±0.5 度', () => {
+    expect(bearingSigmaFor('300')).toBeCloseTo(0.5, 6)
+  })
+
+  it('小数第 1 位まで入れたら幅は 10 分の 1', () => {
+    expect(bearingSigmaFor('300.0')).toBeCloseTo(0.05, 6)
+    expect(bearingSigmaFor('300.4')).toBeCloseTo(0.05, 6)
+  })
+
+  it('桁を増やすほどせまくなる', () => {
+    expect(bearingSigmaFor('300.25')).toBeCloseTo(0.005, 6)
+  })
+
+  it('距離も同じ理屈で読む', () => {
+    expect(distanceSigmaFor('4')).toBeCloseTo(0.5, 6)
+    expect(distanceSigmaFor('3.71')).toBeCloseTo(0.005, 6)
   })
 })

@@ -119,6 +119,48 @@ describe('添付された実例', () => {
   })
 })
 
+describe('観測元の座標の幅', () => {
+  const target = { x: 10, y: 5 }
+
+  it('報告が完璧でも、観測元がマスの幅ぶん分からなければ誤差は残る', () => {
+    // 方位も距離も幅ゼロとして与えても、観測元の 100m マスぶんは残る
+    const exact = [
+      { ...sighting('a', { x: 10, y: 1 }, target, 'bearing'), bearingSigmaDeg: 0 },
+      { ...sighting('b', { x: 6, y: 5 }, target, 'bearing'), bearingSigmaDeg: 0 },
+    ]
+    const accuracy = estimateAccuracy(exact, target)
+    expect(accuracy.radiusKm).toBeGreaterThan(0)
+    expect(accuracy.contributions[0]!.cause).toBe('position')
+  })
+
+  it('観測元の幅を数えないより誤差は大きく出る', () => {
+    // 座標のぶんを数え忘れると、実際より小さく見積もってしまう
+    const observations = [
+      sighting('a', { x: 10, y: 1 }, target, 'bearing'),
+      sighting('b', { x: 11.04, y: 1.14 }, target, 'bearing'),
+    ]
+    const withPosition = estimateAccuracy(observations, target).radiusKm
+    const withoutPosition = estimateAccuracy(
+      observations.map((o) => ({ ...o, positionSigmaKm: 0 })),
+      target,
+    ).radiusKm
+    expect(withPosition).toBeGreaterThan(withoutPosition)
+  })
+
+  it('推定した点を観測元にすると、その点の誤差も乗る', () => {
+    const observations = [
+      sighting('a', { x: 10, y: 1 }, target, 'bearing'),
+      sighting('b', { x: 6, y: 5 }, target, 'bearing'),
+    ]
+    const fromKnown = estimateAccuracy(observations, target).radiusKm
+    const fromEstimated = estimateAccuracy(
+      observations.map((o) => ({ ...o, positionSigmaKm: 0.3 })),
+      target,
+    ).radiusKm
+    expect(fromEstimated).toBeGreaterThan(fromKnown)
+  })
+})
+
 describe('効果半径との突き合わせ', () => {
   it('効果半径の半分までに収まっていれば見込みあり', () => {
     expect(prospect(0.1, 0.25)).toBe('good')

@@ -28,6 +28,14 @@ export interface Observation {
   bearingDeg: number | null
   /** 偵察兵から目標までの距離（km）。無ければ null。 */
   rangeKm: number | null
+  /**
+   * この報告の読み取り幅。三角測量そのものは使わないが、
+   * 見込み誤差を測るときに使う（accuracy.ts）。省略時は既定値。
+   */
+  bearingSigmaDeg?: number
+  rangeSigmaKm?: number
+  /** 観測元の座標の幅（km）。基準点なら、その基準点自身の誤差が入る。 */
+  positionSigmaKm?: number
 }
 
 export interface Estimate {

@@ -50,11 +50,13 @@ describe('観測を足すべき方角', () => {
 
 describe('見立て', () => {
   // 実測した見込み誤差を添えてある。効果半径は HE 250m / AP 150m、照明弾は 500m
-  /** 直角に 4km。±49m */
+  /** 直角に 4km。±86m */
   const square = [look('a', { x: 10, y: 1 }), look('b', { x: 6, y: 5 })]
-  /** 15 度で 4km。±196m */
+  /** 30 度で 4km。±166m */
+  const slant = [look('a', { x: 10, y: 1 }), look('b', { x: 8, y: 1.536 })]
+  /** 15 度で 4km。±331m */
   const narrow = [look('a', { x: 10, y: 1 }), look('b', { x: 11.04, y: 1.14 })]
-  /** 8 度で 6km。±571m */
+  /** 8 度で 6km。±764m */
   const shallow = [look('a', { x: 10, y: -1 }), look('b', { x: 10.83, y: -0.94 })]
 
   it('誤差が効果半径に収まっていれば、撃てると言い切る', () => {
@@ -64,17 +66,17 @@ describe('見立て', () => {
   })
 
   it('効果半径の半分に収まって初めて撃てると言う', () => {
-    // ±49m は HE の 250m の半分（125m）に収まる
+    // ±86m は HE の 250m の半分（125m）に収まる
     expect(advise(square, 'HE')[0]!.kind).toBe('ready')
-    // ±196m は 250m には収まるが半分ではない。当てにできない
-    expect(advise(narrow, 'HE')[0]!.kind).not.toBe('ready')
-    expect(advise(narrow, 'HE').some((a) => a.headline.includes('五分五分'))).toBe(true)
+    // ±166m は 250m には収まるが半分ではない。当てにできない
+    expect(advise(slant, 'HE')[0]!.kind).not.toBe('ready')
+    expect(advise(slant, 'HE').some((a) => a.headline.includes('五分五分'))).toBe(true)
   })
 
   it('効果半径の小さい弾では同じ精度でも足りない', () => {
-    // ±196m は HE では五分五分だが、AP の 150m は超えている
-    expect(advise(narrow, 'HE').some((a) => a.headline.includes('五分五分'))).toBe(true)
-    expect(advise(narrow, 'AP').some((a) => a.headline.includes('外れる公算'))).toBe(true)
+    // ±166m は HE では五分五分だが、AP の 150m は超えている
+    expect(advise(slant, 'HE').some((a) => a.headline.includes('五分五分'))).toBe(true)
+    expect(advise(slant, 'AP').some((a) => a.headline.includes('外れる公算'))).toBe(true)
   })
 
   it('浅い交差では観測を足すよう勧める', () => {
@@ -83,7 +85,7 @@ describe('見立て', () => {
   })
 
   it('誤差が照明弾の範囲に収まるなら照明弾を勧める', () => {
-    // ±196m は照明弾の 500m に収まるので、1 発照らせば見てもらえる
+    // ±331m は照明弾の 500m に収まるので、1 発照らせば見てもらえる
     const advices = advise(narrow, 'AP')
     const star = advices.find((a) => a.kind === 'star')
     expect(star).toBeDefined()

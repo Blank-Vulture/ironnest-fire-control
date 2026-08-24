@@ -2,8 +2,12 @@
  * 標定の見込み誤差。
  *
  * 三角測量の式そのものは正確でも、入ってくる報告には必ず幅がある。
- * 方位は度単位までしか読めないし、座標は 100m 四方のマスまでしか分からない。
- * その幅が位置の誤差にどれだけ化けるかは、観測どうしの交わり方で決まる。
+ * 方位は入れた桁数までしか読めないし、観測元の座標も 100m 四方のマスまでしか
+ * 分からない。その幅が位置の誤差にどれだけ化けるかは、観測どうしの交わり方で決まる。
+ *
+ * 見落としやすいのは観測元の座標のほう。マスの ±50m は方位の ±0.5 度より
+ * 小さく見えるが、浅く交わるとどちらも同じ倍率で増幅されるので、
+ * 近い観測元ほどこちらが効いてくる。数えないと誤差を実際より小さく見積もる。
  *
  * 直角に近く交われば幅はそのまま残るだけだが、浅く交わると跳ね上がる。
  * 交差角 15 度なら、方位が 0.5 度ずれただけで数百 m 動くことがある。
@@ -23,10 +27,19 @@ import { triangulate, type Observation } from './triangulate'
 export const BEARING_SIGMA_DEG = 0.5
 
 /**
- * 距離の読み取り幅（km）。
- * 観測元の座標が 100m 四方のマスまでしか分からないぶんを見込む。
+ * 距離の読み取り幅（km）。桁数が分からないときの既定値。
+ * 観測元の座標のぶんはここではなく POSITION_SIGMA_KM で数える。二重に数えない。
  */
 export const RANGE_SIGMA_KM = 0.05
+
+/**
+ * 観測元の座標の読み取り幅（km）。
+ * 報告に載る座標は 100m 四方のマスまでなので、中心を採っても ±50m の幅が残る。
+ */
+export const POSITION_SIGMA_KM = 0.05
+
+/** その観測の何が効いているか。直す手が変わるので分けて持つ。 */
+export type Cause = 'bearing' | 'range' | 'position'
 
 export interface Contribution {
   /** どの観測か。 */
@@ -34,6 +47,8 @@ export interface Contribution {
   label: string
   /** その観測の幅だけで位置がどれだけ動くか（km）。 */
   shiftKm: number
+  /** いちばん効いている幅。 */
+  cause: Cause
 }
 
 export interface Accuracy {
@@ -73,41 +88,61 @@ export function estimateAccuracy(
   const contributions: Contribution[] = []
 
   observations.forEach((observation, index) => {
-    let shiftKm = 0
+    // 出どころごとに分けて持つ。方位と座標は別々に生じる幅なので、
+    // 大きい方だけ採ると小さい方が覆い隠されて誤差を過小に見積もる
+    const byCause: Record<Cause, number> = { bearing: 0, range: 0, position: 0 }
+
+    /** 振った結果がその出どころのこれまでの最大より大きければ控える。 */
+    const consider = (candidate: Partial<Observation>, from: Cause) => {
+      const moved = displacement(shiftedBy(observations, index, candidate), solved)
+      if (moved > byCause[from]) byCause[from] = moved
+    }
 
     if (observation.bearingDeg !== null) {
-      // 振る向きで効き方が変わることがあるので、大きい方を採る
-      const plus = displacement(
-        shiftedBy(observations, index, {
-          bearingDeg: observation.bearingDeg + BEARING_SIGMA_DEG,
-        }),
-        solved,
-      )
-      const minus = displacement(
-        shiftedBy(observations, index, {
-          bearingDeg: observation.bearingDeg - BEARING_SIGMA_DEG,
-        }),
-        solved,
-      )
-      shiftKm = Math.max(shiftKm, plus, minus)
+      const sigma = observation.bearingSigmaDeg ?? BEARING_SIGMA_DEG
+      // 振る向きで効き方が変わることがあるので、両側を見て大きい方を採る
+      consider({ bearingDeg: observation.bearingDeg + sigma }, 'bearing')
+      consider({ bearingDeg: observation.bearingDeg - sigma }, 'bearing')
     }
 
     if (observation.rangeKm !== null) {
-      const plus = displacement(
-        shiftedBy(observations, index, { rangeKm: observation.rangeKm + RANGE_SIGMA_KM }),
-        solved,
+      const sigma = observation.rangeSigmaKm ?? RANGE_SIGMA_KM
+      consider({ rangeKm: observation.rangeKm + sigma }, 'range')
+      consider(
+        { rangeKm: Math.max(0.01, observation.rangeKm - sigma) },
+        'range',
       )
-      const minus = displacement(
-        shiftedBy(observations, index, {
-          rangeKm: Math.max(0.01, observation.rangeKm - RANGE_SIGMA_KM),
-        }),
-        solved,
-      )
-      shiftKm = Math.max(shiftKm, plus, minus)
     }
 
+    // 観測元がマスのどこにいるか分からないぶん。どちらへずれているかは
+    // 分からないので、四方に振って最悪の向きを採る
+    const positionSigma = observation.positionSigmaKm ?? POSITION_SIGMA_KM
+    if (positionSigma > 0) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        consider(
+          {
+            position: {
+              x: observation.position.x + dx * positionSigma,
+              y: observation.position.y + dy * positionSigma,
+            },
+          },
+          'position',
+        )
+      }
+    }
+
+    // 互いに独立とみなして二乗和平方根でまとめる
+    const shiftKm = Math.hypot(byCause.bearing, byCause.range, byCause.position)
     if (shiftKm > 0) {
-      contributions.push({ id: observation.id, label: observation.label, shiftKm })
+      const cause = (Object.keys(byCause) as Cause[]).reduce((worst, key) =>
+        byCause[key] > byCause[worst] ? key : worst,
+      )
+      contributions.push({
+        id: observation.id,
+        label: observation.label,
+        shiftKm,
+        cause,
+      })
     }
   })
 
