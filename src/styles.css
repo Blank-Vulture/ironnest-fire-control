@@ -3160,3 +3160,77 @@ code {
     padding: 10px;
   }
 }
+
+/* ---------- 保存の初期化 ---------- */
+
+/*
+ * 表記を変えても過去の保存には届かないので、捨てる手段を残しておく。
+ * 常用するものではないため、目に入るが手は伸びない濃さに落としてある。
+ */
+.appfoot {
+  margin-top: 40px;
+  padding: 18px 0 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.reset__arm {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 4px 2px;
+  margin: 0;
+}
+
+.reset__arm {
+  border-bottom: 1px dotted var(--line);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.reset__arm:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.reset__confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.reset__warn {
+  margin: 0;
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.reset__go,
+.reset__cancel {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 5px 14px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.reset__go {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+@media (max-width: 640px) {
+  .appfoot {
+    justify-content: center;
+  }
+
+  .reset__confirm {
+    justify-content: center;
+  }
+}

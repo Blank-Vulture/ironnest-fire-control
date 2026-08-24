@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { HardReset } from './components/HardReset'
 import { ROUTES, ROUTE_TITLE, useHashRoute } from './lib/route'
 import { emptySurveyDoc, Plotting } from './pages/Plotting'
 import { FireControl } from './pages/FireControl'
@@ -535,6 +536,10 @@ export function App() {
           }}
         />
       )}
+
+      <footer className="appfoot">
+        <HardReset />
+      </footer>
     </div>
   )
 }
