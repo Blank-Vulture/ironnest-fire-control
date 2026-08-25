@@ -68,6 +68,46 @@ export interface AdviceInput {
 /**
  * 見立てを組み立てる。効く順に並べる。
  */
+/** 候補ひとつぶんの見立て。どちらを先に撃つか決めるのに使う。 */
+export interface CandidateStat {
+  /** 見込み誤差（km）。 */
+  radiusKm: number
+  /** 報告どうしの食い違い（km）。小さいほど、その点が本物らしい。 */
+  residualKm: number
+}
+
+/** 命中確率の差がこれ以下なら、並んでいるとみなす（割合）。 */
+const TIED_CHANCE = 0.05
+
+/**
+ * 食い違いの差がこれ以下なら、並んでいるとみなす（km）。
+ * 鏡像の候補は理屈のうえでは同値だが、計算の順番で末尾の桁がずれる。
+ * そのまま大小で比べると、桁落ちしだいで既定のタブが入れ替わる。
+ */
+const TIED_RESIDUAL_KM = 0.001
+
+/**
+ * 先に撃つべき候補。0 なら並び、負なら a、正なら b。
+ *
+ * 当たりやすいほうを採る。ただし距離 2 本で出る候補は中心線をはさんだ鏡像なので、
+ * 誤差も鏡像になってほぼ必ず並ぶ。そこで決まらないときは、報告全体との食い違いが
+ * 小さいほう——つまり本物らしいほうを採る。どちらも 0 なら報告からは決められない
+ * ので、順番は動かさない。並べ替わると、見ていた候補が勝手に入れ替わる。
+ */
+export function compareCandidates(
+  a: CandidateStat,
+  b: CandidateStat,
+  effectRadiusKm: number,
+): number {
+  const chanceA = hitChance(a.radiusKm, effectRadiusKm)
+  const chanceB = hitChance(b.radiusKm, effectRadiusKm)
+  if (Math.abs(chanceA - chanceB) > TIED_CHANCE) return chanceB - chanceA
+  if (Math.abs(a.residualKm - b.residualKm) > TIED_RESIDUAL_KM) {
+    return a.residualKm - b.residualKm
+  }
+  return 0
+}
+
 /** 誤差の出どころ。手の打ちようが違うので言い分ける。 */
 function causeLabel(cause: Cause): string {
   if (cause === 'bearing') return '方位'

@@ -3298,3 +3298,70 @@ code {
   opacity: 1;
   color: var(--accent);
 }
+
+/* ---------- 候補地のタブ ---------- */
+
+/*
+ * 候補が 2 つあるときだけ出る。どちらも同じ格好で並べて、片方だけが本命に
+ * 見えないようにする。既定で開くのは当たりやすいほう。
+ */
+.cand {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+
+.cand__tab {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 7px 10px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.cand__tab:hover {
+  border-color: var(--accent);
+}
+
+.cand__tab.is-on {
+  border-color: var(--accent);
+  color: var(--fg);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.cand__name {
+  letter-spacing: 0.04em;
+}
+
+.cand__grid {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.cand__chance {
+  margin-left: auto;
+}
+
+/* 分析上こちらを先に撃つべき、という印 */
+.cand__pick {
+  flex-basis: 100%;
+  color: var(--accent);
+}
+
+@media (max-width: 520px) {
+  .cand {
+    flex-direction: column;
+  }
+}

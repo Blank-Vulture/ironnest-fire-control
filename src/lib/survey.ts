@@ -144,6 +144,8 @@ export interface ResolvedFix {
   chained: boolean
   /** 曖昧さや浅い交差の注意。triangulate から引き継ぐ。 */
   alternative: Point | null
+  /** その別候補の食い違い（km）。無ければ null。 */
+  alternativeResidualKm: number | null
   crossingAngleDeg: number | null
 }
 
@@ -268,6 +270,7 @@ function fromTriangulation(
       accumulatedKm: 0,
       chained,
       alternative: null,
+      alternativeResidualKm: null,
       crossingAngleDeg: null,
     }
   }
@@ -280,10 +283,21 @@ function fromTriangulation(
   const swap = fix.chosen === 2 && estimate.alternative !== null
   const position = swap ? estimate.alternative! : estimate.position
   const alternative = decided ? null : estimate.alternative
+  // 入れ替えたなら食い違いも一緒に入れ替える。片方だけ入れ替えると、
+  // 表示している点と数字が別の候補のものになる
+  const alternativeResidualKm = decided
+    ? null
+    : swap
+      ? estimate.residualKm
+      : estimate.alternativeResidualKm
 
   return {
     fix,
-    status: { kind: 'solved', position, residualKm: estimate.residualKm },
+    status: {
+      kind: 'solved',
+      position,
+      residualKm: swap ? (estimate.alternativeResidualKm ?? 0) : estimate.residualKm,
+    },
     observations,
     pinned: false,
     residualKm: estimate.residualKm,
@@ -295,6 +309,7 @@ function fromTriangulation(
     accumulatedKm: estimateAccuracy(observations, position).radiusKm,
     chained,
     alternative,
+    alternativeResidualKm,
     crossingAngleDeg: estimate.crossingAngleDeg,
   }
 }
@@ -338,6 +353,7 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
           accumulatedKm: 0,
           chained: false,
           alternative: null,
+          alternativeResidualKm: null,
           crossingAngleDeg: null,
         })
         positions.set(fix.id, position)
@@ -396,6 +412,7 @@ export function solveSurvey(doc: SurveyDoc): SurveyResult {
       accumulatedKm: 0,
       chained: true,
       alternative: null,
+      alternativeResidualKm: null,
       crossingAngleDeg: null,
     })
   }

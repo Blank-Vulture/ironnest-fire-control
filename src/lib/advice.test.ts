@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { bearingBetween, distanceBetween, type Point } from './grid'
 import { triangulate, type Observation } from './triangulate'
 import { estimateAccuracy } from './accuracy'
-import { adviseFix, bestViewingBearing } from './advice'
+import { adviseFix, bestViewingBearing, compareCandidates } from './advice'
 import type { ShellCode } from './shells'
 
 const target: Point = { x: 10, y: 5 }
@@ -120,5 +120,38 @@ describe('見立て', () => {
     const advices = advise(two)
     expect(advices[0]!.kind).toBe('decide')
     expect(advices[0]!.atGrid).toBeTruthy()
+  })
+})
+
+describe('先に撃つ候補', () => {
+  const HE = 0.25
+
+  it('当たりやすいほうを先に撃つ', () => {
+    const near = { radiusKm: 0.1, residualKm: 0 }
+    const far = { radiusKm: 0.5, residualKm: 0 }
+    expect(compareCandidates(near, far, HE)).toBeLessThan(0)
+    expect(compareCandidates(far, near, HE)).toBeGreaterThan(0)
+  })
+
+  it('当たりやすさが並んだら、報告に合うほうを採る', () => {
+    // 距離 2 本の候補は鏡像なので、誤差はほぼ必ず並ぶ
+    const fits = { radiusKm: 0.27, residualKm: 0 }
+    const loose = { radiusKm: 0.275, residualKm: 0.4 }
+    expect(compareCandidates(fits, loose, HE)).toBeLessThan(0)
+    expect(compareCandidates(loose, fits, HE)).toBeGreaterThan(0)
+  })
+
+  it('食い違いのほうが大きくても、当たりやすさが違えばそちらを優先する', () => {
+    // 当てられない点に先に撃っても、外れたのか的が違うのか分からない
+    const likely = { radiusKm: 0.9, residualKm: 0 }
+    const hittable = { radiusKm: 0.05, residualKm: 0.4 }
+    expect(compareCandidates(likely, hittable, HE)).toBeGreaterThan(0)
+  })
+
+  it('どちらも決め手が無ければ順番を動かさない', () => {
+    const same = { radiusKm: 0.27, residualKm: 0 }
+    expect(compareCandidates(same, { ...same }, HE)).toBe(0)
+    // 実測どおりの僅差。ここで並べ替わると見ていた候補が勝手に入れ替わる
+    expect(compareCandidates(same, { radiusKm: 0.275, residualKm: 0 }, HE)).toBe(0)
   })
 })

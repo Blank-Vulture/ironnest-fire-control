@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { formatPoint, parseGrid } from '../lib/grid'
 import { SHALLOW_CROSSING_DEG, firingSolutionFrom } from '../lib/triangulate'
-import { estimateAccuracy } from '../lib/accuracy'
+import { estimateAccuracy, hitChance } from '../lib/accuracy'
 import { BearingInput } from './BearingInput'
 import { FixAdvice } from './FixAdvice'
-import { DEFAULT_SHELL, SHELLS } from '../lib/shells'
+import { compareCandidates } from '../lib/advice'
+import { DEFAULT_SHELL, SHELLS, shellByCode } from '../lib/shells'
 import type { Point } from '../lib/grid'
 import type { Fix, KnownPoint, ResolvedFix, Sighting } from '../lib/survey'
 import type { Measurement, Target } from '../lib/targets'
@@ -79,12 +81,61 @@ export function FixCard({
     if (card.outcome === 'miss') badges.push({ label: '不発', tone: 'miss' })
     return badges
   }
-  const position = status.kind === 'solved' ? status.position : null
+  const primary = status.kind === 'solved' ? status.position : null
+  const shell = fix.shell ?? DEFAULT_SHELL
+
+  /**
+   * 候補の一覧。候補が 1 つなら 1 件だけ。
+   *
+   * 見込み誤差は候補ごとに測る。同じ報告でも、どちらの点を追うかで
+   * 振れ方が変わるため。
+   */
+  const candidates: {
+    index: 1 | 2
+    point: Point
+    residualKm: number
+    accuracy: ReturnType<typeof estimateAccuracy> | null
+  }[] = []
+  if (primary !== null) {
+    const measure = (point: Point) =>
+      resolved.observations.length > 0 ? estimateAccuracy(resolved.observations, point) : null
+    candidates.push({
+      index: 1,
+      point: primary,
+      residualKm: resolved.residualKm,
+      accuracy: measure(primary),
+    })
+    if (resolved.alternative !== null) {
+      candidates.push({
+        index: 2,
+        point: resolved.alternative,
+        residualKm: resolved.alternativeResidualKm ?? 0,
+        accuracy: measure(resolved.alternative),
+      })
+    }
+  }
+
+  /**
+   * 先に撃つ候補。当たりやすいほうを既定で開く。
+   *
+   * 並び替えではなく既定の選択だけを変える。番号ごと入れ替えると、
+   * 「候補地 2 へ撃った」という射撃順のカードの指す先が変わってしまう。
+   */
+  const suggested =
+    candidates.length < 2
+      ? 1
+      : [...candidates].sort((a, b) =>
+          compareCandidates(
+            { radiusKm: a.accuracy?.radiusKm ?? 0, residualKm: a.residualKm },
+            { radiusKm: b.accuracy?.radiusKm ?? 0, residualKm: b.residualKm },
+            shellByCode(shell).radiusKm,
+          ),
+        )[0]!.index
+
+  const [picked, setPicked] = useState<1 | 2 | null>(null)
+  const viewing = candidates.find((c) => c.index === (picked ?? suggested)) ?? candidates[0]
+  const position = viewing?.point ?? null
   const solution = position !== null && nest !== null ? firingSolutionFrom(nest, position) : null
-  const altSolution =
-    resolved.alternative !== null && nest !== null
-      ? firingSolutionFrom(nest, resolved.alternative)
-      : null
   const shallow =
     resolved.crossingAngleDeg !== null && resolved.crossingAngleDeg < SHALLOW_CROSSING_DEG
   const badPin =
@@ -118,8 +169,7 @@ export function FixCard({
 
         <span className="fix__position">
           {position !== null ? (formatPoint(position) ?? 'マップ外') : '—'}
-          {resolved.alternative !== null && <span className="fix__cand">候補地 1</span>}
-          <Badges states={stateOf(1)} />
+          {resolved.alternative === null && <Badges states={stateOf(1)} />}
         </span>
 
         <button
@@ -244,7 +294,35 @@ export function FixCard({
         ＋ 観測を追加
       </button>
 
-      <FixStatusLine resolved={resolved} shallow={shallow} />
+      {candidates.length > 1 && (
+        <div className="cand" role="tablist" aria-label="候補地">
+          {candidates.map((c) => (
+            <button
+              key={c.index}
+              role="tab"
+              className={`cand__tab${c.index === viewing?.index ? ' is-on' : ''}`}
+              aria-selected={c.index === viewing?.index}
+              onClick={() => setPicked(c.index)}
+            >
+              <span className="cand__name">候補地 {c.index}</span>
+              <span className="cand__grid">{formatPoint(c.point) ?? 'マップ外'}</span>
+              {c.accuracy !== null && (
+                <span className="cand__chance">
+                  命中 {Math.round(hitChance(c.accuracy.radiusKm, shellByCode(shell).radiusKm) * 100)}%
+                </span>
+              )}
+              {c.index === suggested && <span className="cand__pick">先に撃つ</span>}
+              <Badges states={stateOf(c.index)} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      <FixStatusLine
+        resolved={resolved}
+        shallow={shallow}
+        radiusKm={viewing?.accuracy?.radiusKm ?? resolved.accumulatedKm}
+      />
 
       {/*
         報告の幅が位置の誤差にどれだけ化けるかと、それを縮めるための次の一手。
@@ -253,48 +331,15 @@ export function FixCard({
       {position !== null && !resolved.pinned && resolved.observations.length > 0 && (
         <FixAdvice
           position={position}
-          alternative={resolved.alternative}
-          accuracy={estimateAccuracy(resolved.observations, position)}
+          // 見ている候補から見た「もう一方」。本命固定で渡すと、候補 2 を
+          // 見ているときに自分自身との距離（0m）を出してしまう
+          alternative={
+            candidates.find((c) => c.index !== viewing?.index)?.point ?? null
+          }
+          accuracy={viewing?.accuracy ?? estimateAccuracy(resolved.observations, position)}
           observations={resolved.observations}
-          shell={fix.shell ?? DEFAULT_SHELL}
+          shell={shell}
         />
-      )}
-
-      {resolved.alternative !== null && (
-        <div className="fix__alt">
-          <span className="fix__k">候補地 2</span>
-          <strong className="fix__altgrid">
-            {formatPoint(resolved.alternative) ?? 'マップ外'}
-          </strong>
-          <Badges states={stateOf(2)} />
-          {altSolution !== null && (
-            <>
-              <span className="fix__altsolution">
-                {altSolution.bearingDeg.toFixed(1)}° / {altSolution.distanceKm.toFixed(2)} km
-              </span>
-              <button
-                className="fix__try"
-                title={
-                  fix.isTarget
-                    ? 'こちらへ 1 発撃って、当たるかどうかで候補を絞る'
-                    : '攻撃対象に印を付けると撃てます'
-                }
-                disabled={!fix.isTarget || cardFor(2) !== undefined}
-                onClick={() =>
-                  onAddTarget(
-                    {
-                      bearingDeg: altSolution.bearingDeg,
-                      distanceKm: altSolution.distanceKm,
-                    },
-                    { fixId: fix.id, candidate: 2 },
-                  )
-                }
-              >
-                {cardFor(2) !== undefined ? '追加済み' : '撃って確かめる'}
-              </button>
-            </>
-          )}
-        </div>
       )}
 
       {position !== null && (
@@ -310,19 +355,29 @@ export function FixCard({
             <span className="fix__k">IRON NEST の位置を入れると射撃諸元が出ます</span>
           )}
 
-          {solution !== null && (
+          {solution !== null && viewing !== undefined && (
             <button
               className="fix__use"
-              disabled={!fix.isTarget || cardFor(1) !== undefined}
-              title={fix.isTarget ? undefined : '攻撃対象に印を付けると射撃順に送れます'}
+              disabled={!fix.isTarget || cardFor(viewing.index) !== undefined}
+              title={
+                fix.isTarget
+                  ? candidates.length > 1
+                    ? 'この候補へ 1 発撃って、当たるかどうかで候補を絞る'
+                    : undefined
+                  : '攻撃対象に印を付けると射撃順に送れます'
+              }
               onClick={() =>
                 onAddTarget(
                   { bearingDeg: solution.bearingDeg, distanceKm: solution.distanceKm },
-                  { fixId: fix.id, candidate: 1 },
+                  { fixId: fix.id, candidate: viewing.index },
                 )
               }
             >
-              {cardFor(1) !== undefined ? '追加済み' : '射撃順に追加'}
+              {cardFor(viewing.index) !== undefined
+                ? '追加済み'
+                : candidates.length > 1
+                  ? '撃って確かめる'
+                  : '射撃順に追加'}
             </button>
           )}
         </footer>
@@ -331,7 +386,16 @@ export function FixCard({
   )
 }
 
-function FixStatusLine({ resolved, shallow }: { resolved: ResolvedFix; shallow: boolean }) {
+function FixStatusLine({
+  resolved,
+  shallow,
+  radiusKm,
+}: {
+  resolved: ResolvedFix
+  shallow: boolean
+  /** いま見ている候補の見込み誤差（km）。候補ごとに違うので外から渡す。 */
+  radiusKm: number
+}) {
   const { status } = resolved
 
   if (status.kind === 'pending') {
@@ -364,7 +428,7 @@ function FixStatusLine({ resolved, shallow }: { resolved: ResolvedFix; shallow: 
     <div className="fix__quality">
       <p className="fix__numbers">
         報告の食い違い ±{metres(resolved.residualKm)}
-        {' · '}見込み誤差 ±{metres(resolved.accumulatedKm)}
+        {' · '}見込み誤差 ±{metres(radiusKm)}
         {resolved.crossingAngleDeg !== null &&
           ` · 交差角 ${resolved.crossingAngleDeg.toFixed(0)}°`}
       </p>

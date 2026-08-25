@@ -9,10 +9,17 @@
  * 何がどう動いたかがここに出る。
  */
 import { describe, expect, it } from 'vitest'
-import { bearingBetween, distanceBetween, formatPoint, gridToPoint, parseGrid } from './grid'
+import {
+  bearingBetween,
+  distanceBetween,
+  formatPoint,
+  gridToPoint,
+  parseGrid,
+  type Point,
+} from './grid'
 import { solveSurvey, type SurveyDoc } from './survey'
 import { estimateAccuracy, hitChance, prospect } from './accuracy'
-import { adviseFix } from './advice'
+import { adviseFix, compareCandidates } from './advice'
 import { shellByCode, type ShellCode } from './shells'
 
 const NEST = 'I6 5:3'
@@ -157,4 +164,96 @@ describe('実戦の配置 · 弾種ごとの見立て', () => {
       expect(advise(code)[0]!.kind).toBe('decide')
     }
   })
+})
+
+/**
+ * 方位線が距離円を横断して候補が 2 つ出る配置。
+ *
+ * 距離 2 本で出る候補は中心線をはさんだ鏡像なので、誤差も鏡像になって
+ * ほぼ必ず並ぶ。方位線と円の場合も、弦の両端で円と直線の交わる角度は
+ * 等しいため、たいていは並ぶ。
+ *
+ * 並ばないのは、円をかすめるように横断して、2 つの交点が方位の元から
+ * 別々の距離に出るとき。方位のぶれは距離に比例するので、そこで差が付く。
+ * タブの既定をどちらにするかが意味を持つのはこの場合。
+ */
+describe('候補ごとに当たりやすさが違う配置', () => {
+  const doc: SurveyDoc = {
+    known: [
+      { id: 'nest', label: 'IRON NEST', gridInput: NEST, isNest: true },
+      { id: 's1', label: '偵察兵#1', gridInput: 'Q9 3:7', kind: 'spotter', isNest: false },
+      { id: 's3', label: '偵察兵#3', gridInput: 'M1 5:5', kind: 'spotter', isNest: false },
+    ],
+    fixes: [
+      {
+        id: 'f', label: '目標#4', shell: 'HE', isTarget: true, isReference: false,
+        sightings: [
+          // 偵察兵#1 の方位線が、偵察兵#3 の距離円をかすめて横断する
+          { id: 'a', fromId: 's1', bearingInput: '219.0', rangeInput: '' },
+          { id: 'b', fromId: 's3', bearingInput: '', rangeInput: '2.25' },
+        ],
+      },
+    ],
+  }
+
+  const entry = () => {
+    const e = solveSurvey(doc).fixes.find((f) => f.fix.id === 'f')!
+    if (e.status.kind !== 'solved') throw new Error(e.status.kind)
+    return { ...e, position: e.status.position }
+  }
+
+  const stat = (point: Point) => {
+    const radiusKm = estimateAccuracy(entry().observations, point).radiusKm
+    return { radiusKm, percent: Math.round(hitChance(radiusKm, 0.25) * 100) }
+  }
+
+  it('候補が 2 つ出る', () => {
+    const e = entry()
+    expect(formatPoint(e.position)).toBe('L3 1:2')
+    expect(formatPoint(e.alternative!)).toBe('K2 5:5')
+  })
+
+  it('同じ報告でも、候補によって当たりやすさが倍ちがう', () => {
+    const first = stat(entry().position)
+    const second = stat(entry().alternative!)
+    expect(Math.round(first.radiusKm * 1000)).toBe(414)
+    expect(Math.round(second.radiusKm * 1000)).toBe(829)
+    expect(first.percent).toBe(45)
+    expect(second.percent).toBe(24)
+  })
+
+  it('当たりやすいほうを先に撃つ', () => {
+    const e = entry()
+    const first = { radiusKm: stat(e.position).radiusKm, residualKm: e.residualKm }
+    const second = {
+      radiusKm: stat(e.alternative!).radiusKm,
+      residualKm: e.alternativeResidualKm ?? 0,
+    }
+    expect(compareCandidates(first, second, 0.25)).toBeLessThan(0)
+  })
+
+  it('鏡像で並ぶ配置では、順番を動かさない', () => {
+    // 距離 2 本の実戦の配置。±272m と ±275m でほぼ並ぶ。
+    // 食い違いはどちらも 0 だが、計算の順番で末尾の桁がずれる
+    const e = solveSurvey({
+      known: doc.known,
+      fixes: [{
+        id: 'g', label: '目標', shell: 'HE', isTarget: true, isReference: false,
+        sightings: [
+          { id: 'a', fromId: 's3', bearingInput: '', rangeInput: '5.11' },
+          { id: 'b', fromId: 's1', bearingInput: '', rangeInput: '3.97' },
+        ],
+      }],
+    }).fixes[0]!
+    if (e.status.kind !== 'solved') throw new Error('解けていない')
+    const first = { radiusKm: stat2(e, e.status.position), residualKm: e.residualKm }
+    const second = {
+      radiusKm: stat2(e, e.alternative!),
+      residualKm: e.alternativeResidualKm ?? 0,
+    }
+    expect(compareCandidates(first, second, 0.25)).toBe(0)
+  })
+
+  const stat2 = (e: { observations: Parameters<typeof estimateAccuracy>[0] }, p: Point) =>
+    estimateAccuracy(e.observations, p).radiusKm
 })

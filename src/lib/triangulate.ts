@@ -53,6 +53,13 @@ export interface Estimate {
    */
   alternative: Point | null
   /**
+   * その別候補の食い違い（km）。無ければ null。
+   *
+   * 本命と比べると、どちらが本物らしいかが分かる。どちらも 0 なら報告からは
+   * 決められないので、撃って確かめるしかない。
+   */
+  alternativeResidualKm: number | null
+  /**
    * 方位 2 本だけで解いたときの交差角（度）。
    * 浅いほど誤差が開くので、呼び出し側で注意を促す。
    */
@@ -302,12 +309,12 @@ export function triangulate(observations: readonly Observation[]): Triangulation
   const rms = Math.sqrt(best.score / constraintCount)
 
   // 同じくらい辻褄が合うのに離れている点があれば、決め手が足りていない
-  const alternative =
+  const other =
     pool.find(
       (r) =>
         distanceBetween(r.point, best.point) > AMBIGUITY_SEPARATION_KM &&
         Math.sqrt(r.score / constraintCount) <= Math.max(rms * 1.5, rms + 0.15),
-    )?.point ?? null
+    ) ?? null
 
   return {
     kind: 'solved',
@@ -315,7 +322,9 @@ export function triangulate(observations: readonly Observation[]): Triangulation
       position: best.point,
       residualKm: rms,
       constraintCount,
-      alternative,
+      alternative: other?.point ?? null,
+      alternativeResidualKm:
+        other === null ? null : Math.sqrt(other.score / constraintCount),
       crossingAngleDeg: crossingAngle(usable),
     },
   }
