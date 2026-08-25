@@ -709,17 +709,20 @@ describe('射撃順の番号', () => {
 })
 
 describe('方位の読み取り幅', () => {
-  it('度単位で入れたら丸めぶんの ±0.5 度', () => {
-    expect(bearingSigmaFor('300')).toBeCloseTo(0.5, 6)
-  })
-
-  it('小数第 1 位まで入れたら幅は 10 分の 1', () => {
+  it('点を打たずに入れても、小数第 1 位まで読めた扱いにする', () => {
+    // 報告の方位は必ず小数第 1 位まで来る。その桁がたいてい 0 なので、
+    // 「300」と入れるのは 300.0 のことであって「300 度前後」ではない
+    expect(bearingSigmaFor('300')).toBeCloseTo(0.05, 6)
     expect(bearingSigmaFor('300.0')).toBeCloseTo(0.05, 6)
     expect(bearingSigmaFor('300.4')).toBeCloseTo(0.05, 6)
   })
 
-  it('桁を増やすほどせまくなる', () => {
+  it('小数第 2 位まで入れたら、そのぶんせまくなる', () => {
     expect(bearingSigmaFor('300.25')).toBeCloseTo(0.005, 6)
+  })
+
+  it('距離は書いた桁のとおりに読む。方位のような決まった桁が無いため', () => {
+    expect(distanceSigmaFor('4')).toBeCloseTo(0.5, 6)
   })
 
   it('距離も同じ理屈で読む', () => {

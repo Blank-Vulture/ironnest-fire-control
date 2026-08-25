@@ -1,5 +1,4 @@
 import { formatPoint, parseGrid } from '../lib/grid'
-import { BearingInput } from './BearingInput'
 import { SHALLOW_CROSSING_DEG } from '../lib/triangulate'
 import type { KnownPoint, ResolvedFix, Sighting } from '../lib/survey'
 
@@ -140,13 +139,17 @@ export function NestPanel({
                     aria-label={`${convoy.label} の位置`}
                     aria-invalid={bad}
                   />
-                  <BearingInput
+                  <input
                     className="convoy__num"
                     value={sighting?.bearingInput ?? ''}
-                    onChange={(next) =>
-                      sighting && onSighting(sighting.id, { bearingInput: next })
+                    onChange={(e) =>
+                      sighting && onSighting(sighting.id, { bearingInput: e.target.value })
                     }
-                    label={`${convoy.label} から見た方位`}
+                    placeholder="方位"
+                    inputMode="decimal"
+                    spellCheck={false}
+                    autoComplete="off"
+                    aria-label={`${convoy.label} から見た方位`}
                   />
                   <input
                     className="convoy__num"

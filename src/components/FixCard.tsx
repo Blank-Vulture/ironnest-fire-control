@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { formatPoint, parseGrid } from '../lib/grid'
 import { SHALLOW_CROSSING_DEG, firingSolutionFrom } from '../lib/triangulate'
 import { estimateAccuracy, hitChance } from '../lib/accuracy'
-import { BearingInput } from './BearingInput'
 import { FixAdvice } from './FixAdvice'
 import { compareCandidates } from '../lib/advice'
 import { DEFAULT_SHELL, SHELLS, shellByCode } from '../lib/shells'
@@ -260,11 +259,15 @@ export function FixCard({
               ))}
             </select>
 
-            <BearingInput
+            <input
               className="sight__num"
               value={sighting.bearingInput}
-              onChange={(next) => onSighting(sighting.id, { bearingInput: next })}
-              label="方位"
+              onChange={(e) => onSighting(sighting.id, { bearingInput: e.target.value })}
+              placeholder="方位"
+              inputMode="decimal"
+              spellCheck={false}
+              autoComplete="off"
+              aria-label="方位"
             />
 
             <input

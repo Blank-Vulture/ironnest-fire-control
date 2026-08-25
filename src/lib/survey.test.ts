@@ -430,7 +430,7 @@ describe('実測で確かめた座標', () => {
     }
     const entry = solvedFix(solveSurvey(doc), 'mid')
     expect(entry.residualKm).toBeLessThan(0.001) // 食い違いは無い
-    expect(entry.accumulatedKm).toBeGreaterThan(0.3) // それでも誤差は大きい
+    expect(entry.accumulatedKm).toBeGreaterThan(0.2) // それでも誤差は 200m を超える
   })
 
   it('読めない座標なら、これまでどおり三角測量で解く', () => {

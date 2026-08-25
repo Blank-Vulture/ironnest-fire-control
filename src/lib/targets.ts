@@ -165,7 +165,11 @@ function decimalSigma(input: string): number {
 }
 
 export function bearingSigmaFor(input: string): number {
-  return decimalSigma(input)
+  // 報告の方位は必ず小数第 1 位まで来る。その桁がたいてい 0 なので、点を
+  // 打たずに「300」と入れることになるが、それは 300.0 のことであって
+  // 「300 度前後」ではない。桁を書かなかったぶんまで幅を広げると、
+  // 浅く交わる標定で誤差を実際の 10 倍に見積もる。
+  return Math.min(decimalSigma(input), 0.05)
 }
 
 /** 入れた距離の読み取り幅（km）。理屈は方位と同じ。 */
