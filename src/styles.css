@@ -16,6 +16,8 @@
   --accent: #e0a437;
   --accent-dim: #7a5c1f;
   --danger: #e05a4a;
+  /* 暗い面での「優先」。紙側の濃い橙と同じ役目だが、こちらは沈まない明るさ */
+  --warn: #e08a3c;
 
   /* 弾道計算機が刷る紙。褪せた藁半紙の色で、暗所でも眩しくない */
   --paper: #cdc5b1;
@@ -24,6 +26,8 @@
   --ink: #26241f;
   --ink-soft: #5d5748;
   --stamp: #a8342a;
+  /* 「優先」の橙。判子の赤と並べても別の色に見える濃さにしてある */
+  --stamp-orange: #9c5410;
 
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
@@ -3345,8 +3349,8 @@ code {
 }
 
 .fix__priority.is-raised {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--warn);
+  border-color: var(--warn);
 }
 
 /*
@@ -3364,7 +3368,7 @@ code {
 }
 
 .card__prio.is-raised {
-  color: var(--ink);
-  border-color: var(--ink-soft);
+  color: var(--stamp-orange);
+  border-color: var(--stamp-orange);
   font-weight: 700;
 }
