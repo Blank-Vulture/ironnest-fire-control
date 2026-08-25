@@ -140,7 +140,27 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
 
   /* ---------- 描くもの ---------- */
 
-  const rays: { id: string; fromId: string; from: Point; to: Point; color: string }[] = []
+  const rays: {
+    id: string
+    fromId: string
+    from: Point
+    to: Point
+    color: string
+    /** その標定がまだ解けていない。線は引くが、交点を読ませない。 */
+    unsolved: boolean
+  }[] = []
+
+  /*
+   * 解けていない標定。
+   *
+   * 線は観測元の色で引くので、どの 2 本が同じ目標のものかは見ただけでは
+   * 分からない。解けていない標定の線が実線のまま並ぶと、関係のない線どうしの
+   * 交わりを候補と読み違える。実際、方位が互いの背後を指していて交点が盤外に
+   * 出ている標定でも、画面の上では何本も交わって見えていた。
+   */
+  const unsolvedFixes = new Set(
+    survey.fixes.filter((f) => f.status.kind !== 'solved').map((f) => f.fix.id),
+  )
   const circles: { id: string; fromId: string; at: Point; radius: number; color: string }[] = []
 
   for (const fix of doc.fixes) {
@@ -158,6 +178,7 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
           from,
           to: pointFrom(from, bearingDeg, RAY_KM),
           color,
+          unsolved: unsolvedFixes.has(fix.id),
         })
       }
       const rangeKm = parseDistance(sight.rangeInput)
@@ -381,7 +402,11 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
           {rays.map((ray) => (
             <line
               key={ray.id}
-              className={`map__bearing${dimmed(ray.fromId) ? ' is-dim' : ''}`}
+              className={
+                'map__bearing' +
+                (dimmed(ray.fromId) ? ' is-dim' : '') +
+                (ray.unsolved ? ' is-unsolved' : '')
+              }
               x1={ray.from.x}
               y1={sy(ray.from.y)}
               x2={ray.to.x}
