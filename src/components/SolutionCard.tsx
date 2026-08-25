@@ -84,6 +84,20 @@ export function SolutionCard({
           )}
         </div>
 
+        <select
+          className={`card__prio is-${normalizePriority(target.priority)}`}
+          value={normalizePriority(target.priority)}
+          onChange={(e) => onPriority(e.target.value)}
+          aria-label="撃破の優先度"
+          title="撃破の優先度。高いものから撃つ"
+        >
+          {PRIORITIES.map((p) => (
+            <option key={p.value} value={p.value} title={p.note}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+
         <button
           className={`card__done${target.done ? ' is-on' : ''}`}
           onClick={onToggleDone}
@@ -110,21 +124,6 @@ export function SolutionCard({
             {SHELLS.map((s) => (
               <option key={s.code} value={s.code}>
                 {s.code} — {s.jp}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className={`card__select card__prio is-${normalizePriority(target.priority)}`}>
-          <span className="card__k">優先度</span>
-          <select
-            value={normalizePriority(target.priority)}
-            onChange={(e) => onPriority(e.target.value)}
-            aria-label="撃破の優先度"
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p.value} value={p.value} title={p.note}>
-                {p.label}
               </option>
             ))}
           </select>

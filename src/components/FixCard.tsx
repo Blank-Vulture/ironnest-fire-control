@@ -169,6 +169,20 @@ export function FixCard({
           aria-label="標定点の名前"
         />
 
+        <select
+          className={`fix__priority is-${normalizePriority(fix.priority)}`}
+          value={normalizePriority(fix.priority)}
+          onChange={(e) => onPriority(e.target.value)}
+          aria-label="撃破の優先度"
+          title="撃破の優先度。高いものから撃つ"
+        >
+          {PRIORITIES.map((p) => (
+            <option key={p.value} value={p.value} title={p.note}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+
         <span className="fix__position">
           {position !== null ? (formatPoint(position) ?? 'マップ外') : '—'}
           {resolved.alternative === null && <Badges states={stateOf(1)} />}
@@ -199,20 +213,6 @@ export function FixCard({
         </select>
       </label>
 
-      <label className={`fix__priority is-${normalizePriority(fix.priority)}`}>
-        <span className="fix__k">優先度</span>
-        <select
-          value={normalizePriority(fix.priority)}
-          onChange={(e) => onPriority(e.target.value)}
-          aria-label="撃破の優先度"
-        >
-          {PRIORITIES.map((p) => (
-            <option key={p.value} value={p.value} title={p.note}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-      </label>
 
       {/*
         観測基準点は撃って確かめられる。当たればそこにいると分かるので、
