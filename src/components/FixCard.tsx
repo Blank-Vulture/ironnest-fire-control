@@ -4,7 +4,7 @@ import { SHALLOW_CROSSING_DEG, firingSolutionFrom } from '../lib/triangulate'
 import { estimateAccuracy, hitChance } from '../lib/accuracy'
 import { FixAdvice } from './FixAdvice'
 import { compareCandidates } from '../lib/advice'
-import { PRIORITIES } from '../lib/targets'
+import { PRIORITIES, normalizePriority } from '../lib/targets'
 import { DEFAULT_SHELL, SHELLS, shellByCode } from '../lib/shells'
 import type { Point } from '../lib/grid'
 import type { Fix, KnownPoint, ResolvedFix, Sighting } from '../lib/survey'
@@ -199,10 +199,10 @@ export function FixCard({
         </select>
       </label>
 
-      <label className={`fix__priority is-${fix.priority ?? 'normal'}`}>
+      <label className={`fix__priority is-${normalizePriority(fix.priority)}`}>
         <span className="fix__k">優先度</span>
         <select
-          value={fix.priority ?? 'normal'}
+          value={normalizePriority(fix.priority)}
           onChange={(e) => onPriority(e.target.value)}
           aria-label="撃破の優先度"
         >

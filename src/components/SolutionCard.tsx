@@ -1,7 +1,7 @@
 import { CHARGES, type Charge } from '../lib/ballistics'
 import { SIDE_LABEL, SIDE_MARK, SIDES, type Side } from '../lib/guns'
 import { SHELLS, shellByCode } from '../lib/shells'
-import { PRIORITIES, type PlanStep } from '../lib/targets'
+import { PRIORITIES, normalizePriority, type PlanStep } from '../lib/targets'
 import type { ChargeSetting, GunSetting } from '../lib/targets'
 import { formatFlight, formatTimeDigits, formatTimeOfDay, toTimeDigits } from '../lib/time'
 
@@ -115,10 +115,10 @@ export function SolutionCard({
           </select>
         </label>
 
-        <label className={`card__select card__prio is-${target.priority ?? 'normal'}`}>
+        <label className={`card__select card__prio is-${normalizePriority(target.priority)}`}>
           <span className="card__k">優先度</span>
           <select
-            value={target.priority ?? 'normal'}
+            value={normalizePriority(target.priority)}
             onChange={(e) => onPriority(e.target.value)}
             aria-label="撃破の優先度"
           >

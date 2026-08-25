@@ -39,18 +39,35 @@ export type GunSetting = 'auto' | Side
  * 旋回が忙しいゲームなので射撃順は方位で組んであるが、それは「どれを先に
  * 潰しても構わない」ときの話。高価値目標は旋回を余分に払ってでも先に潰したい。
  */
-export type Priority = 'high' | 'normal' | 'low'
+export type Priority = 'high' | 'raised' | 'normal'
 
 export const PRIORITIES: { value: Priority; label: string; note: string }[] = [
-  { value: 'high', label: '高価値', note: '旋回を余分に払ってでも先に潰す' },
-  { value: 'normal', label: '標準', note: '旋回がいちばん少ない順に撃つ' },
-  { value: 'low', label: '後回し', note: '手が空いてから撃つ' },
+  { value: 'high', label: '高価値', note: '旋回を余分に払ってでも真っ先に潰す' },
+  { value: 'raised', label: '優先', note: '通常の目標より先に撃つ' },
+  { value: 'normal', label: '通常', note: '旋回がいちばん少ない順に撃つ' },
 ]
 
-const PRIORITY_ORDER: Priority[] = ['high', 'normal', 'low']
+/**
+ * 撃つ順に並べた段。既定の「通常」がいちばん下にある。
+ *
+ * 下に「後回し」を置くと、急がない目標をわざわざ指定して回ることになる。
+ * 何も付けなければ後ろへ下がるほうが、手が要らない。
+ */
+const PRIORITY_ORDER: Priority[] = ['high', 'raised', 'normal']
 
 export function isPriority(value: string): value is Priority {
   return PRIORITY_ORDER.includes(value as Priority)
+}
+
+/**
+ * 読めない値を通常として扱う。
+ *
+ * 段が変わる前に付けた「後回し」がそのまま残っていることがある。いまは通常が
+ * いちばん下なので、そこへ寄せれば意味も変わらない。読めない値を素通しすると
+ * どの段にも入らず、射撃順から静かに消える。
+ */
+export function normalizePriority(value: string | undefined): Priority {
+  return value !== undefined && isPriority(value) ? value : 'normal'
 }
 
 export interface Target {
@@ -342,7 +359,9 @@ function orderByPriorityThenBearing(
   let from = fromBearing
 
   for (const priority of PRIORITY_ORDER) {
-    const tier = solutions.filter((s) => (s.target.priority ?? 'normal') === priority)
+    const tier = solutions.filter(
+      (s) => normalizePriority(s.target.priority) === priority,
+    )
     if (tier.length === 0) continue
     const sequence = orderByBearing(tier, from)
     ordered.push(...sequence)

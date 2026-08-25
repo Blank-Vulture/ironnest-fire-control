@@ -14,6 +14,7 @@ import {
   reprojectTarget,
   resupplyQueue,
   solveTarget,
+  type Priority,
   type Target,
 } from './targets'
 import { pointFrom } from './grid'
@@ -166,13 +167,24 @@ describe('撃破の優先度', () => {
     expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([50, 90, 30, 10])
   })
 
-  it('後回しは最後に回る', () => {
+  it('何も付けない目標は自動で後ろへ下がる', () => {
+    // 既定の「通常」がいちばん下の段なので、急ぐものに印を付けるだけで済む
     const plan = buildPlan([
-      at(10, 5, { priority: 'low' }),
-      at(20, 5),
+      at(10, 5),
+      at(20, 5, { priority: 'raised' }),
       at(30, 5, { priority: 'high' }),
     ])
     expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([30, 20, 10])
+  })
+
+  it('段が変わる前に付けた「後回し」は通常として扱う', () => {
+    /*
+     * 保存に残っている古い値。読めないまま素通しするとどの段にも入らず、
+     * 射撃順から静かに消える。いまは通常がいちばん下なので、意味も変わらない。
+     */
+    const stale = { ...at(10, 5), priority: 'low' as unknown as Priority }
+    const plan = buildPlan([stale, at(30, 5, { priority: 'high' })])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([30, 10])
   })
 
   it('優先度を付けなければ、これまでどおり方位だけで並ぶ', () => {

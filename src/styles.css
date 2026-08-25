@@ -3305,8 +3305,8 @@ code {
 /* ---------- 撃破の優先度 ---------- */
 
 /*
- * 高価値だけ色を付ける。標準がほとんどなので、そちらまで色を付けると
- * 画面が塗り分けだらけになって、肝心の高価値が沈む。
+ * 印を付けた段だけ色を出す。既定の「通常」がいちばん多いので、そこまで
+ * 塗ると画面が塗り分けだらけになって、肝心の高価値が沈む。
  */
 .fix__priority.is-high select,
 .card__prio.is-high select {
@@ -3314,7 +3314,8 @@ code {
   border-color: var(--danger);
 }
 
-.fix__priority.is-low select,
-.card__prio.is-low select {
-  color: var(--muted);
+.fix__priority.is-raised select,
+.card__prio.is-raised select {
+  color: var(--accent);
+  border-color: var(--accent);
 }
