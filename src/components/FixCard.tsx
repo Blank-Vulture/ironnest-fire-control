@@ -4,6 +4,7 @@ import { SHALLOW_CROSSING_DEG, firingSolutionFrom } from '../lib/triangulate'
 import { estimateAccuracy, hitChance } from '../lib/accuracy'
 import { FixAdvice } from './FixAdvice'
 import { compareCandidates } from '../lib/advice'
+import { PRIORITIES } from '../lib/targets'
 import { DEFAULT_SHELL, SHELLS, shellByCode } from '../lib/shells'
 import type { Point } from '../lib/grid'
 import type { Fix, KnownPoint, ResolvedFix, Sighting } from '../lib/survey'
@@ -28,6 +29,7 @@ interface Props {
   onPinnedGrid: (gridInput: string) => void
   /** 弾種の変更。紐づく射撃順のカードがあれば、そちらの弾種も合わせて変わる。 */
   onShell: (code: string) => void
+  onPriority: (value: string) => void
   /** この標定から出した射撃順のカード。状態をここに映す。 */
   linked: readonly Target[]
 }
@@ -50,6 +52,7 @@ export function FixCard({
   onToggleTarget,
   onPinnedGrid,
   onShell,
+  onPriority,
   linked,
 }: Props) {
   const { fix, status } = resolved
@@ -191,6 +194,21 @@ export function FixCard({
           {SHELLS.map((s) => (
             <option key={s.code} value={s.code}>
               {s.code} — {s.jp}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className={`fix__priority is-${fix.priority ?? 'normal'}`}>
+        <span className="fix__k">優先度</span>
+        <select
+          value={fix.priority ?? 'normal'}
+          onChange={(e) => onPriority(e.target.value)}
+          aria-label="撃破の優先度"
+        >
+          {PRIORITIES.map((p) => (
+            <option key={p.value} value={p.value} title={p.note}>
+              {p.label}
             </option>
           ))}
         </select>

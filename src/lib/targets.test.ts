@@ -140,6 +140,73 @@ describe('目標の解', () => {
   })
 })
 
+describe('撃破の優先度', () => {
+  it('高価値目標を先に撃つ。旋回が遠くても', () => {
+    // 10, 30 は隣同士。200 だけが反対側にあるが、そちらが高価値
+    const plan = buildPlan([
+      at(10, 5),
+      at(30, 5),
+      at(200, 5, { priority: 'high' }),
+    ])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([200, 10, 30])
+  })
+
+  it('段の中では方位で並べる', () => {
+    /*
+     * 高価値の 50, 90 を先に撃つ。撃ち終えた砲塔は 90 を向いているので、
+     * 標準の 10, 30 へは近い 30 から入って 10 へ抜けるほうが安い。
+     * 段の中を方位で並べるだけでなく、回る向きも直前の段から決まる。
+     */
+    const plan = buildPlan([
+      at(90, 5, { priority: 'high' }),
+      at(10, 5),
+      at(50, 5, { priority: 'high' }),
+      at(30, 5),
+    ])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([50, 90, 30, 10])
+  })
+
+  it('後回しは最後に回る', () => {
+    const plan = buildPlan([
+      at(10, 5, { priority: 'low' }),
+      at(20, 5),
+      at(30, 5, { priority: 'high' }),
+    ])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([30, 20, 10])
+  })
+
+  it('優先度を付けなければ、これまでどおり方位だけで並ぶ', () => {
+    const plan = buildPlan([at(90, 5), at(10, 5), at(50, 5)])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([10, 50, 90])
+  })
+
+  it('段を跨ぐときは、直前の段を撃ち終えた方位から続ける', () => {
+    /*
+     * 高価値を 100→140 で終えると、砲塔は 140 を向いている。標準の 350 と 10
+     * のうち、そこから近いのは 10（130 度）で、350 は 150 度ある。
+     * 近いほうから入るので 10→350 になる。段ごとに独立して組んで必ず
+     * 「隙間の直後」から始めると、ここで 20 度余計に回ることになる。
+     */
+    const plan = buildPlan([
+      at(100, 5, { priority: 'high' }),
+      at(140, 5, { priority: 'high' }),
+      at(350, 5),
+      at(10, 5),
+    ])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([100, 140, 10, 350])
+  })
+
+  it('境界をまたぐ配置でも、段の中で隙間を跨がない', () => {
+    // 359 と 1 は隣。150 は反対側。高価値の中でも 359→1 の順になってほしい
+    const plan = buildPlan([
+      at(150, 5, { priority: 'high' }),
+      at(1, 5, { priority: 'high' }),
+      at(359, 5, { priority: 'high' }),
+    ])
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([359, 1, 150])
+  })
+})
+
 describe('射撃計画', () => {
   it('方位順に並べる', () => {
     const plan = buildPlan([at(90, 5), at(10, 5), at(50, 5)])

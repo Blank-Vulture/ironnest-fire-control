@@ -21,6 +21,7 @@ import {
   distanceSigmaFor,
   parseBearing,
   parseDistance,
+  type Priority,
 } from './targets'
 import { estimateAccuracy, POSITION_SIGMA_KM } from './accuracy'
 import { triangulate, type Observation, type Triangulation } from './triangulate'
@@ -87,6 +88,8 @@ export interface Fix {
   sightings: Sighting[]
   /** 他の標定の観測元に使う。オフなら観測元の選択肢に出ない。 */
   isReference: boolean
+  /** 撃破の優先度。射撃順に送ったカードと同じものを指す。 */
+  priority?: Priority
   /** 撃つ相手。オフなら射撃順に送れない（誤って基準点を撃たないための歯止め）。 */
   isTarget: boolean
   /**
@@ -583,6 +586,14 @@ export function defaultShellFor(fix: Fix | undefined): ShellCode {
  * そこで片方向ずつ、呼ばれたときだけ書き換える。ここは標定側の書き換えで、
  * カード側からの書き換えを標定に映すときにも使う（App.tsx を参照）。
  */
+export function applyFixPriority(
+  doc: SurveyDoc,
+  fixId: PointId,
+  priority: Priority,
+): SurveyDoc {
+  return { ...doc, fixes: doc.fixes.map((f) => (f.id === fixId ? { ...f, priority } : f)) }
+}
+
 export function applyFixShell(doc: SurveyDoc, fixId: PointId, shell: ShellCode): SurveyDoc {
   return { ...doc, fixes: doc.fixes.map((f) => (f.id === fixId ? { ...f, shell } : f)) }
 }

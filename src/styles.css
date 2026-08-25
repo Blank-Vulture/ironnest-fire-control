@@ -3301,3 +3301,20 @@ code {
     flex-direction: column;
   }
 }
+
+/* ---------- 撃破の優先度 ---------- */
+
+/*
+ * 高価値だけ色を付ける。標準がほとんどなので、そちらまで色を付けると
+ * 画面が塗り分けだらけになって、肝心の高価値が沈む。
+ */
+.fix__priority.is-high select,
+.card__prio.is-high select {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.fix__priority.is-low select,
+.card__prio.is-low select {
+  color: var(--muted);
+}

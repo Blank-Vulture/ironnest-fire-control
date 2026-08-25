@@ -1,13 +1,14 @@
 import { CHARGES, type Charge } from '../lib/ballistics'
 import { SIDE_LABEL, SIDE_MARK, SIDES, type Side } from '../lib/guns'
 import { SHELLS, shellByCode } from '../lib/shells'
-import type { PlanStep } from '../lib/targets'
+import { PRIORITIES, type PlanStep } from '../lib/targets'
 import type { ChargeSetting, GunSetting } from '../lib/targets'
 import { formatFlight, formatTimeDigits, formatTimeOfDay, toTimeDigits } from '../lib/time'
 
 interface Props {
   step: PlanStep
   onShell: (code: string) => void
+  onPriority: (value: string) => void
   onCharge: (charge: ChargeSetting) => void
   onGun: (gun: GunSetting) => void
   onImpact: (digits: string) => void
@@ -30,6 +31,7 @@ interface Props {
 export function SolutionCard({
   step,
   onShell,
+  onPriority,
   onCharge,
   onGun,
   onImpact,
@@ -108,6 +110,21 @@ export function SolutionCard({
             {SHELLS.map((s) => (
               <option key={s.code} value={s.code}>
                 {s.code} — {s.jp}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className={`card__select card__prio is-${target.priority ?? 'normal'}`}>
+          <span className="card__k">優先度</span>
+          <select
+            value={target.priority ?? 'normal'}
+            onChange={(e) => onPriority(e.target.value)}
+            aria-label="撃破の優先度"
+          >
+            {PRIORITIES.map((p) => (
+              <option key={p.value} value={p.value} title={p.note}>
+                {p.label}
               </option>
             ))}
           </select>

@@ -17,6 +17,7 @@ import { Turret } from './Turret'
 interface Props {
   plan: Plan
   onShell: (id: string, code: string) => void
+  onPriority: (id: string, value: string) => void
   onCharge: (id: string, charge: ChargeSetting) => void
   onGun: (id: string, gun: GunSetting) => void
   onImpact: (id: string, digits: string) => void
@@ -54,6 +55,7 @@ function Turn({ deg, className }: { deg: number; className: string }) {
 export function FiringPlan({
   plan,
   onShell,
+  onPriority,
   onCharge,
   onGun,
   onImpact,
@@ -120,6 +122,7 @@ export function FiringPlan({
           <SolutionCard
             step={step}
             onShell={(code) => onShell(step.solution.target.id, code)}
+            onPriority={(value) => onPriority(step.solution.target.id, value)}
             onCharge={(charge) => onCharge(step.solution.target.id, charge)}
             onGun={(gun) => onGun(step.solution.target.id, gun)}
             onImpact={(digits) => onImpact(step.solution.target.id, digits)}

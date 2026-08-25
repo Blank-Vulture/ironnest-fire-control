@@ -33,6 +33,26 @@ import { crossesMidnight, launchSod, parseTimeOfDay } from './time'
 export type ChargeSetting = 'auto' | Charge
 export type GunSetting = 'auto' | Side
 
+/**
+ * 撃破の優先度。
+ *
+ * 旋回が忙しいゲームなので射撃順は方位で組んであるが、それは「どれを先に
+ * 潰しても構わない」ときの話。高価値目標は旋回を余分に払ってでも先に潰したい。
+ */
+export type Priority = 'high' | 'normal' | 'low'
+
+export const PRIORITIES: { value: Priority; label: string; note: string }[] = [
+  { value: 'high', label: '高価値', note: '旋回を余分に払ってでも先に潰す' },
+  { value: 'normal', label: '標準', note: '旋回がいちばん少ない順に撃つ' },
+  { value: 'low', label: '後回し', note: '手が空いてから撃つ' },
+]
+
+const PRIORITY_ORDER: Priority[] = ['high', 'normal', 'low']
+
+export function isPriority(value: string): value is Priority {
+  return PRIORITY_ORDER.includes(value as Priority)
+}
+
 export interface Target {
   id: string
   /** 方位角（度、0 以上 360 未満）。 */
@@ -48,6 +68,8 @@ export interface Target {
   impactDigits: string
   /** 撃ち終えたか。射撃計画からは外れ、完了一覧に移る。 */
   done: boolean
+  /** 撃破の優先度。無ければ標準。 */
+  priority?: Priority
   /** どの標定点から来たか。標定と射撃順を連動させるための紐づけ。 */
   originFixId?: string
   /** 候補が 2 つあるとき、どちらを撃つか。1 が本命、2 がもう一方。 */
@@ -303,6 +325,34 @@ function orderByBearing(
 }
 
 /**
+ * 優先度の段ごとに並べ、段の中は方位で最適化する。
+ *
+ * 高価値目標を先に潰したいが、段の中まで方位を無視すると旋回だけで時間を
+ * 食い潰す。段を跨ぐときは、直前の段を撃ち終えた方位から続けて寄せるので、
+ * 戻りの旋回も最小になる。
+ *
+ * 段そのものは跨いで混ぜない。「高価値なのに旋回が近いから後回し」を許すと、
+ * なぜその順なのかが画面から読み取れなくなる。
+ */
+function orderByPriorityThenBearing(
+  solutions: readonly TargetSolution[],
+  fromBearing: number | null,
+): TargetSolution[] {
+  const ordered: TargetSolution[] = []
+  let from = fromBearing
+
+  for (const priority of PRIORITY_ORDER) {
+    const tier = solutions.filter((s) => (s.target.priority ?? 'normal') === priority)
+    if (tier.length === 0) continue
+    const sequence = orderByBearing(tier, from)
+    ordered.push(...sequence)
+    from = sequence[sequence.length - 1]?.target.bearingDeg ?? from
+  }
+
+  return ordered
+}
+
+/**
  * 射撃計画を組む。
  *
  * 砲の割り当ては、指定があればそれを使い、無ければ直前と反対の砲にする。
@@ -328,7 +378,10 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
     null,
   )
 
-  const ordered = orderByBearing(placeable, lastFired?.target.bearingDeg ?? null)
+  const ordered = orderByPriorityThenBearing(
+    placeable,
+    lastFired?.target.bearingDeg ?? null,
+  )
 
   let lastGun: Side | null = lastFired?.target.firedGun ?? null
   let totalTurnDeg = 0
@@ -443,6 +496,26 @@ export function reprojectTarget(target: Target, from: Point, to: Point): Target 
     bearingDeg: bearingBetween(to, absolute),
     distanceKm: distanceBetween(to, absolute),
   }
+}
+
+/* ---------- 優先度の同期 ---------- */
+
+/** 1 枚のカードの優先度を書き換える。 */
+export function applyTargetPriority(
+  targets: readonly Target[],
+  targetId: string,
+  priority: Priority,
+): Target[] {
+  return targets.map((t) => (t.id === targetId ? { ...t, priority } : t))
+}
+
+/** ある標定から出したカードすべての優先度を書き換える。弾種と同じ考え方。 */
+export function applyOriginPriority(
+  targets: readonly Target[],
+  fixId: string,
+  priority: Priority,
+): Target[] {
+  return targets.map((t) => (t.originFixId === fixId ? { ...t, priority } : t))
 }
 
 /* ---------- 弾種の同期 ---------- */

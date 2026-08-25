@@ -4,6 +4,7 @@ import { ROUTES, ROUTE_TITLE, useHashRoute } from './lib/route'
 import { emptySurveyDoc, Plotting } from './pages/Plotting'
 import { FireControl } from './pages/FireControl'
 import {
+  applyFixPriority,
   applyFixShell,
   defaultShellFor,
   isFixDurable,
@@ -16,7 +17,9 @@ import {
 import { firingSolutionFrom } from './lib/triangulate'
 import { formatPoint, parseGrid, pointFrom, type Point } from './lib/grid'
 import {
+  applyOriginPriority,
   applyOriginShell,
+  applyTargetPriority,
   applyTargetShell,
   buildPlan,
   newTarget,
@@ -27,6 +30,7 @@ import {
 } from './lib/targets'
 import { nextTargetLabel } from './lib/survey'
 import type { ShellCode } from './lib/shells'
+import type { Priority } from './lib/targets'
 
 const TARGETS_KEY = 'iron-nest-timing/v4'
 const SURVEY_KEY = 'iron-nest-timing/survey/v2'
@@ -211,6 +215,9 @@ export function App() {
         {
           ...newTarget(measurement.bearingDeg, measurement.distanceKm),
           shell: defaultShellFor(originFix),
+          // 優先度も標定から引き継ぐ。送ってから付け直すのでは、
+          // 送った直後の並びだけが優先度を無視した順になる
+          priority: originFix?.priority ?? 'normal',
           originFixId: origin?.fixId,
           candidate: origin?.candidate,
         },
@@ -441,6 +448,23 @@ export function App() {
     setTargets((prev) => applyOriginShell(prev, fixId, shell))
   }, [])
 
+  /** 標定側で優先度を変えたら、そこから出した射撃順のカードにも映す。 */
+  const setFixPriority = useCallback((fixId: string, priority: Priority) => {
+    setDoc((prev) => applyFixPriority(prev, fixId, priority))
+    setTargets((prev) => applyOriginPriority(prev, fixId, priority))
+  }, [])
+
+  /** 射撃順のカード側で優先度を変えたら、紐づく標定にも映す。 */
+  const setTargetPriority = useCallback(
+    (targetId: string, priority: Priority) => {
+      const target = targets.find((t) => t.id === targetId)
+      setTargets((prev) => applyTargetPriority(prev, targetId, priority))
+      if (target?.originFixId === undefined) return
+      setDoc((prev) => applyFixPriority(prev, target.originFixId!, priority))
+    },
+    [targets],
+  )
+
   /** 射撃順のカード側で弾種を変えたら、紐づく標定にも映す。 */
   const setTargetShell = useCallback(
     (targetId: string, shell: ShellCode) => {
@@ -516,6 +540,7 @@ export function App() {
           onNestMoved={reprojectLoose}
           onRemember={remember}
           onFixShell={setFixShell}
+          onFixPriority={setFixPriority}
         />
       ) : (
         <FireControl
@@ -524,6 +549,7 @@ export function App() {
           onAdd={(measurements) => measurements.forEach((m) => sendToFireControl(m))}
           onPatch={patch}
           onShell={setTargetShell}
+          onPriority={setTargetPriority}
           onToggleDone={toggleDone}
           onReportOutcome={reportOutcome}
           onReportMiss={reportMiss}

@@ -29,7 +29,7 @@ import {
   type SurveyDoc,
 } from '../lib/survey'
 import { isShellCode, type ShellCode } from '../lib/shells'
-import type { Measurement, Target } from '../lib/targets'
+import { isPriority, type Measurement, type Priority, type Target } from '../lib/targets'
 import type { TargetOrigin } from '../App'
 
 interface Props {
@@ -46,6 +46,7 @@ interface Props {
   /** 元に戻せるよう、構造を動かす操作の前に呼ぶ。 */
   onRemember: (label: string) => void
   /** 弾種の変更。紐づく射撃順のカードがあれば、そちらの弾種も合わせて変わる。 */
+  onFixPriority: (fixId: string, priority: Priority) => void
   onFixShell: (fixId: string, shell: ShellCode) => void
 }
 
@@ -124,6 +125,7 @@ export function Plotting({
   onNestMoved,
   onRemember,
   onFixShell,
+  onFixPriority,
 }: Props) {
   const [pasteError, setPasteError] = useState<string[]>([])
   const [highlight, setHighlight] = useState<string | null>(null)
@@ -583,6 +585,9 @@ export function Plotting({
               durable={isFixDurable(doc, resolved.fix.id)}
               onAddTarget={onAddTarget}
               onShell={(code) => isShellCode(code) && onFixShell(resolved.fix.id, code)}
+              onPriority={(value) =>
+                isPriority(value) && onFixPriority(resolved.fix.id, value)
+              }
               onToggleReference={() => {
                 // 役割が変われば呼び名も変わる。手で付けた名前はそのまま残す
                 const becoming = !resolved.fix.isReference
