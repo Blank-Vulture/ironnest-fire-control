@@ -66,13 +66,27 @@ function shiftedBy(
   return observations.map((o, i) => (i === index ? { ...o, ...change } : o))
 }
 
-/** 振った報告で解き直して、答えがどれだけ動いたかを測る。 */
+/**
+ * 振った報告で解き直して、答えがどれだけ動いたかを測る。
+ *
+ * 候補が 2 つある解では、どちらを「本命」と名乗るかが解き直すたびに入れ替わる。
+ * 返ってきた position をそのまま測ると、追っている点の動きではなく候補の
+ * 入れ替わりを測ってしまい、候補間の距離ぶんが誤差に化ける。近いほうを採って、
+ * 同じ点を追い続ける。候補が 2 つあること自体は、誤差とは別に伝える話。
+ *
+ * 解けなくなった振り方は 0 として飛ばす。ほとんど接する 2 円は、少し離すと
+ * 交わらなくなる。反対向きに振ったぶんが同じ幅を捉えるので、そちらで足りる。
+ */
 function displacement(
   observations: readonly Observation[],
   from: Point,
 ): number {
   const result = triangulate(observations)
-  return result.kind === 'solved' ? distanceBetween(from, result.estimate.position) : 0
+  if (result.kind !== 'solved') return 0
+  const { position, alternative } = result.estimate
+  const moved = distanceBetween(from, position)
+  if (alternative === null) return moved
+  return Math.min(moved, distanceBetween(from, alternative))
 }
 
 /**

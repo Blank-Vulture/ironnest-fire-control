@@ -78,12 +78,26 @@ describe('実戦の配置', () => {
     expect(distanceBetween(nest, entry.position).toFixed(2)).toBe('5.75')
   })
 
-  it('ほとんど接する 2 円なので、観測元のマスが km 単位に化ける', () => {
+  it('ほとんど接する 2 円なので、観測元のマスが数百 m に開く', () => {
     const entry = solved()
     const accuracy = estimateAccuracy(entry.observations, entry.position)
-    expect(Math.round(accuracy.radiusKm * 1000)).toBe(1745)
+    expect(Math.round(accuracy.radiusKm * 1000)).toBe(272)
     // 距離は小数 2 桁まで読めていて ±5m しかない。効いているのは座標のほう
     expect(accuracy.contributions[0]!.cause).toBe('position')
+  })
+
+  it('候補の入れ替わりを誤差に数えない', () => {
+    /*
+     * 解き直すたびに、どちらの候補を「本命」と名乗るかが入れ替わる。
+     * 返ってきた position をそのまま測っていた頃は、追っている点の動きでは
+     * なく候補の入れ替わりを測ってしまい、候補間の 868m ぶんが誤差に化けて
+     * ±1745m と出ていた。候補が 2 つ離れているほど大きく出るという、
+     * 誤差としてはあべこべな振る舞いになる。
+     */
+    const entry = solved()
+    const accuracy = estimateAccuracy(entry.observations, entry.position)
+    const apart = distanceBetween(entry.position, entry.alternative!)
+    expect(accuracy.radiusKm).toBeLessThan(apart)
   })
 
   it('報告どうしは矛盾していない。食い違いだけ見ても危うさは分からない', () => {
@@ -100,11 +114,11 @@ describe('実戦の配置 · 弾種ごとの見立て', () => {
 
   const table: [ShellCode, number, number, string][] = [
     // 弾種, 効果半径 km, 命中の見込み %, 判定
-    ['ATMC', 3.0, 91, 'good'],
-    ['SMK', 1.0, 43, 'marginal'],
-    ['CYAN', 0.75, 33, 'poor'],
-    ['HE', 0.25, 11, 'poor'],
-    ['AP', 0.15, 7, 'poor'],
+    ['ATMC', 3.0, 100, 'good'],
+    ['SMK', 1.0, 100, 'good'],
+    ['CYAN', 0.75, 99, 'good'],
+    ['HE', 0.25, 64, 'fair'],
+    ['AP', 0.15, 42, 'marginal'],
   ]
 
   for (const [code, effectRadiusKm, percent, verdict] of table) {
@@ -116,14 +130,26 @@ describe('実戦の配置 · 弾種ごとの見立て', () => {
   }
 
   it('ATMC では、当たらないかのような見立てを出さない', () => {
-    // 誤差 ±1745m は効果半径 3000m の半分より大きいが、それでも 9 割方当たる。
-    // 割合で切っていた頃はここを「五分五分」と呼んでいた
+    // 効果半径 3000m に対して誤差は ±272m しかない
     const headlines = advise('ATMC').map((a) => a.headline)
     expect(headlines.some((h) => /五分五分|外れる公算|確実ではない/.test(h))).toBe(false)
   })
 
-  it('HE では、はっきり外れると言う', () => {
-    expect(advise('HE').some((a) => a.headline.includes('外れる公算'))).toBe(true)
+  it('効果半径が誤差に近づくほど、見立てが辛くなる', () => {
+    expect(advise('HE').some((a) => a.headline.includes('確実ではない'))).toBe(true)
+    expect(advise('AP').some((a) => a.headline.includes('五分五分'))).toBe(true)
+  })
+
+  it('候補が割れているうちは、照らす話を二重に出さない', () => {
+    /*
+     * 「候補を 1 つに絞る」がすでに照らす場所を出している。そこへ別の座標で
+     * 照明弾・偵察飛行の話を重ねると、「間を照らせば両方を確かめられます」と
+     * 「照らしきれません」が同じ画面に並んでしまう。
+     */
+    const kinds = advise('ATMC').map((a) => a.kind)
+    expect(kinds).toContain('decide')
+    expect(kinds).not.toContain('star')
+    expect(kinds).not.toContain('recon')
   })
 
   it('弾種によらず、まず候補を 1 つに絞れと言う', () => {

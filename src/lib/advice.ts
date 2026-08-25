@@ -148,25 +148,38 @@ export function adviseFix(input: AdviceInput): Advice[] {
     })
   }
 
-  // 照明弾は着弾点のまわりを照らす。誤差がその範囲に収まるなら 1 発で足りる
-  if (accuracy.radiusKm <= starRadiusKm) {
-    advice.push({
-      kind: 'star',
-      headline: '照明弾で照らす',
-      detail:
-        `見込み誤差 ±${metres(accuracy.radiusKm)} は照明弾の範囲 ${metres(starRadiusKm)} に ` +
-        '収まるので、1 発で目標を照らせます。偵察兵から新しい報告をもらってください',
-      atGrid: formatPoint(position) ?? undefined,
-    })
-  } else {
-    advice.push({
-      kind: 'recon',
-      headline: '偵察飛行で写真を撮る',
-      detail:
-        `見込み誤差 ±${metres(accuracy.radiusKm)} は照明弾の範囲 ${metres(starRadiusKm)} を ` +
-        '超えるので、照らしきれません。ここへ 1 発撃って、その着弾点まわりの写真を撮ってください',
-      atGrid: formatPoint(position) ?? undefined,
-    })
+  /*
+   * 照らすか飛ばすかは、候補が 1 つに決まってから。
+   *
+   * 候補が 2 つ残っているときは、上の「候補を 1 つに絞る」がもう照らす場所まで
+   * 出している。ここで別の座標を指してもう一度照らす話をすると、同じ画面に
+   * 「間を照らせば両方を確かめられます」と「照らしきれません」が並ぶ。
+   * 見る側には矛盾としか読めない。
+   *
+   * 精度の見立て（この先）は候補が割れていても出す。矛盾はしないし、
+   * どちらを選ぶにせよ知っておきたい話なので。
+   */
+  if (alternative === null) {
+    // 照明弾は着弾点のまわりを照らす。誤差がその範囲に収まるなら 1 発で足りる
+    if (accuracy.radiusKm <= starRadiusKm) {
+      advice.push({
+        kind: 'star',
+        headline: '照明弾で照らす',
+        detail:
+          `見込み誤差 ±${metres(accuracy.radiusKm)} は照明弾の範囲 ${metres(starRadiusKm)} に ` +
+          '収まるので、1 発で目標を照らせます。偵察兵から新しい報告をもらってください',
+        atGrid: formatPoint(position) ?? undefined,
+      })
+    } else {
+      advice.push({
+        kind: 'recon',
+        headline: '偵察飛行で写真を撮る',
+        detail:
+          `見込み誤差 ±${metres(accuracy.radiusKm)} は照明弾の範囲 ${metres(starRadiusKm)} を ` +
+          '超えるので、照らしきれません。ここへ 1 発撃って、その着弾点まわりの写真を撮ってください',
+        atGrid: formatPoint(position) ?? undefined,
+      })
+    }
   }
 
   if (outlook === 'poor') {

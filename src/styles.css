@@ -3238,53 +3238,63 @@ code {
 /* ---------- 方位の入力 ---------- */
 
 /*
- * 小数点で 2 つに分ける。報告の小数第 1 位はたいてい 0 なので、
- * そちらは細く落として、整数部だけ打てば済むようにしてある。
- * 幅は呼ぶ側のクラス（.sight__num / .convoy__num）が決める。
+ * 整数部と小数第 1 位で欄を分ける。報告の小数第 1 位はたいてい 0 なので、
+ * そちらは畳んで「.0」のボタンにしておき、押したときだけ欄になる。
+ * 整数部の幅は呼ぶ側のクラス（.sight__num / .convoy__num）が決める。
  */
 .bearing {
   display: inline-flex;
-  align-items: baseline;
-  gap: 0;
-  padding-inline: 6px;
-}
-
-.bearing__whole,
-.bearing__frac {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  color: inherit;
-  font: inherit;
-  text-align: inherit;
+  align-items: stretch;
   min-width: 0;
 }
 
-.bearing__whole:focus,
+.bearing__whole {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.bearing__tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding-inline: 3px;
+}
+
+.bearing__dot {
+  color: var(--muted);
+}
+
+.bearing__frac {
+  width: 1.4ch;
+  padding: 0;
+  text-align: center;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  border-radius: 0;
+  color: var(--fg);
+  font: inherit;
+}
+
 .bearing__frac:focus {
   outline: none;
 }
 
-.bearing__whole {
-  flex: 1 1 auto;
-  text-align: right;
-}
-
-.bearing__dot,
-.bearing__frac {
+/* 畳んでいる間の「.0」。押せると分かる程度に留めて、整数部から目を奪わない */
+.bearing__open {
+  background: none;
+  border: none;
+  padding: 0 4px;
   color: var(--muted);
-  transition: color 120ms ease;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 120ms ease, color 120ms ease;
 }
 
-.bearing__frac {
-  flex: 0 0 auto;
-  width: 1ch;
-  text-align: left;
-}
-
-/* 0 以外を入れる場面では、そこが目に入ってほしい */
-.bearing:focus-within .bearing__dot,
-.bearing__frac:focus {
-  color: var(--fg);
+.bearing__open:hover,
+.bearing__open:focus-visible {
+  opacity: 1;
+  color: var(--accent);
 }
