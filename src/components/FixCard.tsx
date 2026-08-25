@@ -1,6 +1,7 @@
 import { formatPoint, parseGrid } from '../lib/grid'
 import { SHALLOW_CROSSING_DEG, firingSolutionFrom } from '../lib/triangulate'
 import { estimateAccuracy } from '../lib/accuracy'
+import { BearingInput } from './BearingInput'
 import { FixAdvice } from './FixAdvice'
 import { DEFAULT_SHELL, SHELLS } from '../lib/shells'
 import type { Point } from '../lib/grid'
@@ -209,15 +210,11 @@ export function FixCard({
               ))}
             </select>
 
-            <input
+            <BearingInput
               className="sight__num"
               value={sighting.bearingInput}
-              onChange={(e) => onSighting(sighting.id, { bearingInput: e.target.value })}
-              placeholder="方位"
-              inputMode="decimal"
-              spellCheck={false}
-              autoComplete="off"
-              aria-label="方位"
+              onChange={(next) => onSighting(sighting.id, { bearingInput: next })}
+              label="方位"
             />
 
             <input

@@ -11,7 +11,7 @@
 
 import { formatPoint, type Point } from './grid'
 import { shellByCode, type ShellCode } from './shells'
-import { BEARING_SIGMA_DEG, type Accuracy, type Cause, prospect } from './accuracy'
+import { type Accuracy, type Cause, hitChance, prospect } from './accuracy'
 import type { Observation } from './triangulate'
 import { bearingBetween } from './grid'
 
@@ -116,13 +116,18 @@ export function adviseFix(input: AdviceInput): Advice[] {
   const outlook = prospect(accuracy.radiusKm, effectRadiusKm)
 
 
+  // 確率は目安なので 5% 刻みに丸める。1 の位まで出すと、
+  // 見積もりの粗さに見合わない細かさに見える
+  const chance = `${Math.round(hitChance(accuracy.radiusKm, effectRadiusKm) * 20) * 5}%`
+  const versus =
+    `見込み誤差 ±${metres(accuracy.radiusKm)} に対して ` +
+    `${shell} の効果半径は ${metres(effectRadiusKm)}`
+
   if (alternative === null && outlook === 'good') {
     advice.push({
       kind: 'ready',
-      headline: '撃てる見込み',
-      detail:
-        `見込み誤差 ±${metres(accuracy.radiusKm)} は ${shell} の効果半径 ` +
-        `${metres(effectRadiusKm)} に収まっています`,
+      headline: `撃てる見込み（命中 およそ ${chance}）`,
+      detail: versus,
     })
     return advice
   }
@@ -140,21 +145,6 @@ export function adviseFix(input: AdviceInput): Advice[] {
           ? `いま効いているのは ${worst.label} の${causeLabel(worst.cause)}` +
             `（±${metres(worst.shiftKm)}）です${causeNote(worst.cause)}`
           : ''),
-    })
-  }
-
-  // 方位を度単位で入れているなら、桁を増やすだけで幅が 10 分の 1 になる。
-  // 座標と違って手元で減らせるぶんなので、効いていなくても勧めておく
-  const roundedBearing = observations.some(
-    (o) => o.bearingDeg !== null && (o.bearingSigmaDeg ?? BEARING_SIGMA_DEG) >= 0.5,
-  )
-  if (roundedBearing) {
-    advice.push({
-      kind: 'observe',
-      headline: '方位を小数第 1 位まで入れる',
-      detail:
-        `方位を「300」と入れると丸めだけで ±0.5° の幅が出ます。` +
-        `ゲーム内で測った「300.0」のように小数まで入れると、幅は 10 分の 1 になります`,
     })
   }
 
@@ -182,18 +172,20 @@ export function adviseFix(input: AdviceInput): Advice[] {
   if (outlook === 'poor') {
     advice.push({
       kind: 'observe',
-      headline: 'このまま撃つと外れる公算',
-      detail:
-        `見込み誤差 ±${metres(accuracy.radiusKm)} が ${shell} の効果半径 ` +
-        `${metres(effectRadiusKm)} を超えています`,
+      headline: `このまま撃つと外れる公算（命中 およそ ${chance}）`,
+      detail: versus,
     })
   } else if (outlook === 'marginal') {
     advice.push({
       kind: 'observe',
-      headline: '当たるかどうかは五分五分',
-      detail:
-        `見込み誤差 ±${metres(accuracy.radiusKm)} が ${shell} の効果半径 ` +
-        `${metres(effectRadiusKm)} と同じくらいあります。外れても不思議ではありません`,
+      headline: `当たるかどうかは五分五分（命中 およそ ${chance}）`,
+      detail: `${versus}。外れても不思議ではありません`,
+    })
+  } else if (outlook === 'fair') {
+    advice.push({
+      kind: 'observe',
+      headline: `当たる公算はあるが確実ではない（命中 およそ ${chance}）`,
+      detail: versus,
     })
   }
 

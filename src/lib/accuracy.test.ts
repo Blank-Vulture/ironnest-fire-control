@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { bearingBetween, distanceBetween, gridToPoint, parseGrid, type Point } from './grid'
 import { triangulate, type Observation } from './triangulate'
-import { BEARING_SIGMA_DEG, estimateAccuracy, prospect } from './accuracy'
+import { BEARING_SIGMA_DEG, estimateAccuracy, hitChance, prospect } from './accuracy'
 
 const at = (grid: string) => gridToPoint(parseGrid(grid)!)
 
@@ -162,16 +162,37 @@ describe('観測元の座標の幅', () => {
 })
 
 describe('効果半径との突き合わせ', () => {
-  it('効果半径の半分までに収まっていれば見込みあり', () => {
-    expect(prospect(0.1, 0.25)).toBe('good')
-    expect(prospect(0.125, 0.25)).toBe('good')
+  /** 命中確率（%）。読みやすいように丸めて比べる。 */
+  const pct = (radiusKm: number, effectRadiusKm: number) =>
+    Math.round(hitChance(radiusKm, effectRadiusKm) * 100)
+
+  it('誤差が小さいほど当たる', () => {
+    expect(pct(0.1, 0.25)).toBe(99)
+    expect(pct(0.125, 0.25)).toBe(95)
+    expect(pct(0.25, 0.25)).toBe(68)
+    expect(pct(0.9, 0.25)).toBe(22)
   })
-  it('効果半径と同じくらいなら五分五分', () => {
-    expect(prospect(0.2, 0.25)).toBe('marginal')
-    expect(prospect(0.25, 0.25)).toBe('marginal')
+
+  it('誤差がゼロなら必ず当たる', () => {
+    expect(hitChance(0, 0.25)).toBe(1)
   })
-  it('効果半径を超えたら外れる公算', () => {
-    expect(prospect(0.26, 0.25)).toBe('poor')
-    expect(prospect(0.9, 0.25)).toBe('poor')
+
+  it('名前は命中確率で決まる', () => {
+    expect(prospect(0.1, 0.25)).toBe('good') // 99%
+    expect(prospect(0.125, 0.25)).toBe('good') // 95%
+    expect(prospect(0.25, 0.25)).toBe('fair') // 68%
+    expect(prospect(0.9, 0.25)).toBe('poor') // 22%
+  })
+
+  it('五分五分と呼ぶのは、本当に五分五分のときだけ', () => {
+    // 実際に外れた射撃。HE の効果半径 250m に対して ±337m
+    expect(pct(0.337, 0.25)).toBe(54)
+    expect(prospect(0.337, 0.25)).toBe('marginal')
+  })
+
+  it('効果半径の半分の誤差を五分五分とは呼ばない', () => {
+    // ATMC の効果半径 3000m に対して ±1542m。まず当たる
+    expect(pct(1.542, 3)).toBe(95)
+    expect(prospect(1.542, 3)).toBe('good')
   })
 })

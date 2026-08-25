@@ -3234,3 +3234,57 @@ code {
     justify-content: center;
   }
 }
+
+/* ---------- 方位の入力 ---------- */
+
+/*
+ * 小数点で 2 つに分ける。報告の小数第 1 位はたいてい 0 なので、
+ * そちらは細く落として、整数部だけ打てば済むようにしてある。
+ * 幅は呼ぶ側のクラス（.sight__num / .convoy__num）が決める。
+ */
+.bearing {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  padding-inline: 6px;
+}
+
+.bearing__whole,
+.bearing__frac {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  min-width: 0;
+}
+
+.bearing__whole:focus,
+.bearing__frac:focus {
+  outline: none;
+}
+
+.bearing__whole {
+  flex: 1 1 auto;
+  text-align: right;
+}
+
+.bearing__dot,
+.bearing__frac {
+  color: var(--muted);
+  transition: color 120ms ease;
+}
+
+.bearing__frac {
+  flex: 0 0 auto;
+  width: 1ch;
+  text-align: left;
+}
+
+/* 0 以外を入れる場面では、そこが目に入ってほしい */
+.bearing:focus-within .bearing__dot,
+.bearing__frac:focus {
+  color: var(--fg);
+}

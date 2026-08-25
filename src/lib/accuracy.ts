@@ -155,16 +155,45 @@ export function estimateAccuracy(
 }
 
 /**
- * 見込み誤差と砲弾の効果半径を突き合わせた見立て。
+ * 見込み誤差と砲弾の効果半径から、当たる見込みを出す。
  *
- * 誤差が効果半径と同じくらいあると、当たるかどうかは五分五分になる。
- * 「収まっているから大丈夫」と言えるのは、効果半径の半分までに
- * 収まっているとき。そこを超えたら際どい、超え切ったら外れる公算とする。
+ * 以前は「誤差が効果半径の半分までなら良し、効果半径までなら五分五分」と
+ * 割合で切っていた。切る場所に根拠が無く、付ける名前も実態と合っていなかった。
+ * 誤差が効果半径のちょうど半分なら当たる見込みは 95% あるのに「五分五分」と
+ * 呼んでいたし、1.35 倍で「外れる公算」と言い切っていたが実際は 54% だった。
+ *
+ * 見込み誤差はばらつきの 1 標準偏差にあたるので、そこから確率を出して
+ * 名前を付ける。切る場所は変わらず割合で決まるが、確率という意味のある量に
+ * 結び付くので、「五分五分」が本当に五分五分を指すようになる。
+ *
+ * 浅い交差では誤差が一方向に細長く伸びるため、いちばん延びる向きの
+ * 正規分布として見る。全方向に均した見方より辛く出るので、
+ * 撃つ判断としてはこちら側に寄せておく。
  */
-export type Prospect = 'good' | 'marginal' | 'poor'
+function erf(x: number): number {
+  // Abramowitz & Stegun 7.1.26。小数 7 桁まで合うので、この用途には十分
+  const t = 1 / (1 + 0.3275911 * Math.abs(x))
+  const y =
+    1 -
+    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t +
+      0.254829592) *
+      t *
+      Math.exp(-x * x)
+  return x >= 0 ? y : -y
+}
+
+/** 効果半径のなかに目標が入る見込み（0〜1）。 */
+export function hitChance(radiusKm: number, effectRadiusKm: number): number {
+  if (radiusKm <= 0) return 1
+  return erf(effectRadiusKm / (radiusKm * Math.SQRT2))
+}
+
+export type Prospect = 'good' | 'fair' | 'marginal' | 'poor'
 
 export function prospect(radiusKm: number, effectRadiusKm: number): Prospect {
-  if (radiusKm <= effectRadiusKm * 0.5) return 'good'
-  if (radiusKm <= effectRadiusKm) return 'marginal'
+  const chance = hitChance(radiusKm, effectRadiusKm)
+  if (chance >= 0.9) return 'good'
+  if (chance >= 0.6) return 'fair'
+  if (chance >= 0.35) return 'marginal'
   return 'poor'
 }

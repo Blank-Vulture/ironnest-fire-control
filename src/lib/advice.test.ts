@@ -65,18 +65,27 @@ describe('見立て', () => {
     expect(advise(square)).toHaveLength(1)
   })
 
-  it('効果半径の半分に収まって初めて撃てると言う', () => {
-    // ±86m は HE の 250m の半分（125m）に収まる
+  it('当たる見込みが高ければ撃てると言い切る', () => {
+    // ±86m 対 HE の 250m。命中はほぼ確実
     expect(advise(square, 'HE')[0]!.kind).toBe('ready')
-    // ±166m は 250m には収まるが半分ではない。当てにできない
-    expect(advise(slant, 'HE')[0]!.kind).not.toBe('ready')
-    expect(advise(slant, 'HE').some((a) => a.headline.includes('五分五分'))).toBe(true)
+  })
+
+  it('言い切れない精度なら、そう言う', () => {
+    // ±166m 対 HE の 250m。当たる公算はあるが確実ではない
+    const shots = advise(slant, 'HE')
+    expect(shots[0]!.kind).not.toBe('ready')
+    expect(shots.some((a) => a.headline.includes('確実ではない'))).toBe(true)
   })
 
   it('効果半径の小さい弾では同じ精度でも足りない', () => {
-    // ±166m は HE では五分五分だが、AP の 150m は超えている
-    expect(advise(slant, 'HE').some((a) => a.headline.includes('五分五分'))).toBe(true)
-    expect(advise(slant, 'AP').some((a) => a.headline.includes('外れる公算'))).toBe(true)
+    // 同じ ±331m でも、HE の 250m なら五分五分、AP の 150m では届かない
+    expect(advise(narrow, 'HE').some((a) => a.headline.includes('五分五分'))).toBe(true)
+    expect(advise(narrow, 'AP').some((a) => a.headline.includes('外れる公算'))).toBe(true)
+  })
+
+  it('見立てには命中の見込みを添える', () => {
+    expect(advise(square, 'HE')[0]!.headline).toMatch(/命中 およそ \d+%/)
+    expect(advise(narrow, 'HE').some((a) => /命中 およそ \d+%/.test(a.headline))).toBe(true)
   })
 
   it('浅い交差では観測を足すよう勧める', () => {
