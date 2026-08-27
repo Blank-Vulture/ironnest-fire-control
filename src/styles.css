@@ -3522,7 +3522,9 @@ code {
 /* 見出しの座標。表示のときは文字そのもの、触ると入力欄と分かる程度に */
 .fix__grid {
   width: 100%;
-  min-width: 0;
+  /* 座標が読める幅は必ず残す。0 まで潰れると、値は入っているのに
+     見えないという、いちばん困る壊れ方をする */
+  min-width: 5.5em;
   background: none;
   border: 1px solid transparent;
   border-radius: 5px;
@@ -3545,4 +3547,60 @@ code {
 
 .fix__grid[aria-invalid='true'] {
   border-color: var(--danger);
+}
+
+/* ---------- 演習モード ---------- */
+
+/* 「＋ 標定を追加」と横に並べる。確認が開くと折り返して 2 行になる */
+.fixes__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.drill__confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.drill__warn {
+  margin: 0;
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.drill__go,
+.drill__cancel {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 5px 14px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.drill__go {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/*
+ * 狭い画面では見出しを 2 段に折る。
+ *
+ * 名前・優先度・座標・削除を 1 行に並べると、余った幅を受け持つ座標の欄が
+ * まっさきに潰れる。値は入っているのに読めないという状態になるので、
+ * 名前を 1 段目へ追い出して、2 段目を優先度・座標・削除で分け合う。
+ */
+@media (max-width: 560px) {
+  .fix__head {
+    grid-template-columns: auto 1fr 26px;
+  }
+
+  .fix__label {
+    grid-column: 1 / -1;
+  }
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FixCard } from '../components/FixCard'
 import { GridMap } from '../components/GridMap'
 import { NestPanel } from '../components/NestPanel'
+import { generateDrill } from '../lib/drill'
 import { formatPoint } from '../lib/grid'
 import {
   MAP_HEIGHT_KM,
@@ -131,6 +132,9 @@ export function Plotting({
   const [pasteError, setPasteError] = useState<string[]>([])
   const [highlight, setHighlight] = useState<string | null>(null)
   const [nestOpen, setNestOpen] = useState(true)
+  // 演習モードは今の標定をまるごと上書きする。押し間違いで手入力の分を
+  // 消してしまわないよう、HardReset と同じ二段階の確認を挟む。
+  const [drillArmed, setDrillArmed] = useState(false)
 
   const patchKnown = (pointId: string, change: Partial<KnownPoint>) =>
     onChange({ ...doc, known: doc.known.map((k) => (k.id === pointId ? { ...k, ...change } : k)) })
@@ -638,12 +642,42 @@ export function Plotting({
           </details>
         )}
 
-        <button
-          className="section__add"
-          onClick={() => onChange({ ...doc, fixes: [...doc.fixes, newFix(doc)] })}
-        >
-          ＋ 標定を追加
-        </button>
+        <div className="fixes__actions">
+          <button
+            className="section__add"
+            onClick={() => onChange({ ...doc, fixes: [...doc.fixes, newFix(doc)] })}
+          >
+            ＋ 標定を追加
+          </button>
+
+          {drillArmed ? (
+            <div className="drill__confirm">
+              <p className="drill__warn">
+                いまの偵察兵・基準点・標定をすべて演習用の盤面に差し替えます。取り消しは効きません
+              </p>
+              <button
+                className="drill__go"
+                onClick={() => {
+                  onChange(generateDrill(Date.now()))
+                  setDrillArmed(false)
+                }}
+              >
+                差し替える
+              </button>
+              <button className="drill__cancel" onClick={() => setDrillArmed(false)}>
+                やめる
+              </button>
+            </div>
+          ) : (
+            <button
+              className="section__add"
+              onClick={() => setDrillArmed(true)}
+              title="ランダムな状況を組み立てて、いまの標定と差し替えます"
+            >
+              ▶ 演習
+            </button>
+          )}
+        </div>
       </section>
 
       <footer className="footnote">

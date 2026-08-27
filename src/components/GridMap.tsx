@@ -132,9 +132,15 @@ export function GridMap({ doc, survey, highlight, onHighlight, hidden, targets }
     if (point?.kind === 'impact') return IMPACT
     const spotterIndex = spotters.findIndex((k) => k.id === id)
     if (spotterIndex >= 0) return friendlyColor(spotterIndex)
-    // 撃って確かめた標定は、もう推定ではなく基準点として働いている
+    /*
+     * 観測基準点の印が付いた標定は、実測で確かめる前でも基準点の色にする。
+     *
+     * 色は味方か敵かを表す。推定か実測かは別の軸なので、カード側の「実測」の
+     * 印で分ければよい。実測を待って赤のままにしておくと、こちらが立てた
+     * 測量の基準が敵と同じ色で並ぶことになる。
+     */
     const fix = doc.fixes.find((f) => f.id === id)
-    if (fix?.isReference === true && fix.pinnedGrid !== undefined) return REFERENCE
+    if (fix?.isReference === true) return REFERENCE
     return HOSTILE
   }
 
