@@ -423,13 +423,19 @@ describe('撃った後の引き継ぎ', () => {
     expect(gunOf(after, 30)).toBe(gunOf(before, 30))
   })
 
-  it('砲塔の現在位置から、寄せるのが安い側へ回る', () => {
-    // 残りは 10 と 20。砲塔は 30 を向いている。奥端 20 に寄って反時計回りが安い。
+  it('撃った 1 発だけを基準に、回る向きを選び直したりしない', () => {
+    /*
+     * 30 は他に何も撃っていない状態での 1 発目なので、10・20 の並びはいつもどおり
+     * 隙間の直後から時計回りに決まる（10 → 20）。撃った 30 自身の方位を「現在位置」
+     * として向きの選び直しに使うと、その 1 発を基準に毎回いちばん安い側へ回ろうと
+     * してしまい、後から他を飛ばして撃つたびに残りの並びが逆転する。
+     * 実際の旋回量（turnFromPrev）は引き続き 30 を向いた砲塔からの実測値になる。
+     */
     const plan = buildPlan([fired(30, 'left', 1), at(10, 5), at(20, 5)])
-    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([20, 10])
-    expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(-10) // 左へ 10 度
-    expect(plan.steps[1]!.turnFromPrev).toBeCloseTo(-10)
-    expect(plan.totalTurnDeg).toBeCloseTo(20)
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([10, 20])
+    expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(-20)
+    expect(plan.steps[1]!.turnFromPrev).toBeCloseTo(10)
+    expect(plan.totalTurnDeg).toBeCloseTo(30)
   })
 
   it('手前端に寄る方が安ければ時計回りのまま', () => {
@@ -650,13 +656,18 @@ describe('撃った後の境界（0 度をまたぐ引き継ぎ）', () => {
     expect(plan.totalTurnDeg).toBeCloseTo(151)
   })
 
-  it('0 度をまたぐ塊を、まるごと左回りに舐める', () => {
-    // 残りは 350・10・20 の塊。砲塔は 20 度の少し先の 25 度を向いている。
-    // 手前端 350 まで右に 35 度戻すより、奥端 20 から左へ舐めて 0 度を跨ぐ方が安い。
+  it('撃った 1 発だけでは、0 度をまたぐ塊でも向きを選び直さない', () => {
+    /*
+     * 残りは 350・10・20 の塊。25 は他に何も撃っていない状態での 1 発目なので、
+     * 塊の並びはいつもどおり隙間の直後から時計回りに決まる（350 → 10 → 20）。
+     * 25 自身を基準に安い側を選び直すと反時計回りの方が近く見えるが、それは
+     * 「撃つたびに向きを選び直す」と同じ挙動になってしまう。実際の最初の旋回
+     * （turnFromPrev）は引き続き 25 を向いた砲塔からの実測値なので大きく出る。
+     */
     const plan = buildPlan([firedAt(25), at(350, 5), at(10, 5), at(20, 5)])
-    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([20, 10, 350])
-    expect(plan.steps.map((s) => s.turnFromPrev)).toEqual([-5, -10, -20])
-    expect(plan.totalTurnDeg).toBeCloseTo(35) // 時計回りに回ると 65 度かかる
+    expect(plan.steps.map((s) => s.solution.target.bearingDeg)).toEqual([350, 10, 20])
+    expect(plan.steps.map((s) => s.turnFromPrev)).toEqual([-35, 20, 10])
+    expect(plan.totalTurnDeg).toBeCloseTo(65)
   })
 
   it('手前端の方が近ければ、0 度をまたぐ塊でも右回りに舐める', () => {
@@ -669,6 +680,61 @@ describe('撃った後の境界（0 度をまたぐ引き継ぎ）', () => {
   it('砲塔が目標と同じ方位なら、最初の旋回は 0 になる', () => {
     const plan = buildPlan([firedAt(359.9), at(359.9, 5), at(10, 5)])
     expect(plan.steps[0]!.turnFromPrev).toBeCloseTo(0)
+  })
+})
+
+describe('撃っても残りの並びが変わらない', () => {
+  const skip = (targets: readonly Target[], bearingDeg: number, firedAt: number, firedGun: 'left' | 'right') =>
+    targets.map((t) =>
+      t.bearingDeg === bearingDeg ? { ...t, done: true, firedAt, firedGun } : t,
+    )
+
+  it('弧をまたぐ配置で、飛ばして撃っても残りの並びは崩れない', () => {
+    /*
+     * バグの再現ケース。350・10・30・170 は弧をまたいで並ぶ。170 を飛ばして
+     * 先に撃つと、以前の実装では残り 3 件（350・10・30）が完全に逆順になって
+     * いた。撃つ前に決めた並びから 170 を抜いただけの形を保つべきで、
+     * それ以外の並びが選び直されてはいけない。
+     */
+    const targets = [at(350, 5), at(10, 5), at(30, 5), at(170, 5)]
+    const before = buildPlan(targets)
+    expect(before.steps.map((s) => s.solution.target.bearingDeg)).toEqual([350, 10, 30, 170])
+
+    const after = buildPlan(skip(targets, 170, 1, 'left'))
+    expect(after.steps.map((s) => s.solution.target.bearingDeg)).toEqual([350, 10, 30])
+  })
+
+  it('端ではなく途中の 1 件を飛ばして撃っても崩れない', () => {
+    // 弧の端（170）ではなく、真ん中寄りの 10 を飛ばして撃つ場合も同じ
+    const targets = [at(350, 5), at(10, 5), at(30, 5), at(170, 5)]
+    const after = buildPlan(skip(targets, 10, 1, 'left'))
+    expect(after.steps.map((s) => s.solution.target.bearingDeg)).toEqual([350, 30, 170])
+  })
+
+  it('続けて何件飛ばして撃っても、そのたびに並びが選び直されない', () => {
+    // 170 を撃った後、続けて 30 も飛ばして撃つ。残る 350・10 の並びは変わらない
+    const targets = [at(350, 5), at(10, 5), at(30, 5), at(170, 5)]
+    const afterOne = buildPlan(skip(targets, 170, 1, 'left'))
+    expect(afterOne.steps.map((s) => s.solution.target.bearingDeg)).toEqual([350, 10, 30])
+
+    const afterTwo = buildPlan(skip(skip(targets, 170, 1, 'left'), 30, 2, 'right'))
+    expect(afterTwo.steps.map((s) => s.solution.target.bearingDeg)).toEqual([350, 10])
+  })
+
+  it('順番どおりに撃つ分には、もともと並びは変わらない', () => {
+    // 回帰確認。先頭から順に撃つケースはバグ修正前から問題なかった
+    const targets = [at(350, 5), at(10, 5), at(30, 5), at(170, 5)]
+    const after = buildPlan(skip(targets, 350, 1, 'left'))
+    expect(after.steps.map((s) => s.solution.target.bearingDeg)).toEqual([10, 30, 170])
+  })
+
+  it('新しい目標を足したときは、並びが変わってよい', () => {
+    // 撃った操作では並びを変えないが、目標が増えて弧の形自体が変わるときは
+    // 並びが変わって当然。それ自体は崩れとして扱わない
+    const targets = [at(350, 5), at(10, 5), at(30, 5), at(170, 5)]
+    const after = buildPlan([...skip(targets, 170, 1, 'left'), at(190, 5)])
+    expect(after.steps.map((s) => s.solution.target.bearingDeg)).toContain(190)
+    expect(after.steps).toHaveLength(4) // 350, 10, 30, 190（170 は完了済み）
   })
 })
 

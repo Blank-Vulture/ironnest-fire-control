@@ -147,6 +147,8 @@ export interface FiringPlan {
   unplaced: TargetSolution[]
   /** 撃ち終えたもの。順序は入力順のまま。 */
   done: TargetSolution[]
+  /** 撃ち終えたぶんの手順。番号は撃つ前と同じものを持つ。 */
+  doneSteps: PlanStep[]
 }
 
 export function newTarget(bearingDeg: number, distanceKm: number): Target {
@@ -342,6 +344,28 @@ function orderByBearing(
 }
 
 /**
+ * 段の中で最初に撃った 1 発より前は、どこを向いていたか。
+ *
+ * 「今の lastFired」をそのまま向く先に使うと、段の中の 2 発目以降を
+ * 撃つたびに、その撃った目標自身が新しい基準点になってしまう。基準点が
+ * 段の中の目標そのものだと、外れ値どうしの距離がほぼ 0 になって毎回
+ * 逆回りが選ばれやすくなる。1 発目より前という固定点を使えば、その段を
+ * 何発飛ばして撃っても基準点が動かない。
+ */
+function bearingBeforeFire(
+  done: readonly TargetSolution[],
+  firedAt: number,
+): number | null {
+  const prior = done.filter(
+    (s) => s.target.firedAt !== undefined && s.target.firedAt < firedAt,
+  )
+  if (prior.length === 0) return null
+  return prior.reduce((latest, s) =>
+    s.target.firedAt! > latest.target.firedAt! ? s : latest,
+  ).target.bearingDeg
+}
+
+/**
  * 優先度の段ごとに並べ、段の中は方位で最適化する。
  *
  * 高価値目標を先に潰したいが、段の中まで方位を無視すると旋回だけで時間を
@@ -350,20 +374,40 @@ function orderByBearing(
  *
  * 段そのものは跨いで混ぜない。「高価値なのに旋回が近いから後回し」を許すと、
  * なぜその順なのかが画面から読み取れなくなる。
+ *
+ * `full` には撃ち終えた分も混ぜて渡す。除いてしまうと、抜けた 1 発ぶんだけ
+ * 隙間の形が変わり、残り全体の回る向きを毎回選び直すことになる。撃った分は
+ * 向きを決めるためだけに使い、実際の計画（呼び出し側）には残さない。
  */
 function orderByPriorityThenBearing(
-  solutions: readonly TargetSolution[],
+  full: readonly TargetSolution[],
+  done: readonly TargetSolution[],
   fromBearing: number | null,
 ): TargetSolution[] {
   const ordered: TargetSolution[] = []
   let from = fromBearing
 
   for (const priority of PRIORITY_ORDER) {
-    const tier = solutions.filter(
-      (s) => normalizePriority(s.target.priority) === priority,
-    )
+    const tier = full.filter((s) => normalizePriority(s.target.priority) === priority)
     if (tier.length === 0) continue
-    const sequence = orderByBearing(tier, from)
+
+    const firedInTier = tier.filter(
+      (s) => s.target.done && s.target.firedAt !== undefined,
+    )
+
+    // 段の中でまだ何も撃っていなければ、これまでどおり直前の段から続けて
+    // 寄せる。すでに撃った分があれば、その段の向きはもう決まっているので、
+    // 1 発目より前の基準点で組み直すだけにして、以後は選び直さない。
+    const effectiveFrom =
+      firedInTier.length > 0
+        ? bearingBeforeFire(
+            done,
+            Math.min(...firedInTier.map((s) => s.target.firedAt!)),
+          )
+        : from
+
+    const sequence = orderByBearing(tier, effectiveFrom)
+    // 撃った分も残したまま返す。番号を振るのに使う（buildPlan を参照）
     ordered.push(...sequence)
     from = sequence[sequence.length - 1]?.target.bearingDeg ?? from
   }
@@ -379,10 +423,11 @@ function orderByPriorityThenBearing(
  */
 export function buildPlan(targets: readonly Target[]): FiringPlan {
   const solutions = targets.map(solveTarget)
-  // 撃ち終えた目標は旋回にも射撃順にも関わらないので、まず外す
   const done = solutions.filter((s) => s.target.done)
   const remaining = solutions.filter((s) => !s.target.done)
-  const placeable = remaining.filter((s) => !s.outOfRange)
+  // 射撃順に載せるのは撃ち終えていない分だけだが、並びを決めるときは
+  // 撃った分も混ぜたまま渡す（orderByPriorityThenBearing 側で外す）。
+  const full = solutions.filter((s) => !s.outOfRange)
   const unplaced = remaining.filter((s) => s.outOfRange)
 
   // 最後に撃った 1 発が、砲塔の現在の方位と直前に使った砲を教えてくれる。
@@ -398,7 +443,8 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
   )
 
   const ordered = orderByPriorityThenBearing(
-    placeable,
+    full,
+    done,
     lastFired?.target.bearingDeg ?? null,
   )
 
@@ -406,7 +452,31 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
   let totalTurnDeg = 0
   const fireCount: Record<Side, number> = { left: 0, right: 0 }
 
-  const steps: PlanStep[] = ordered.map((solution, i) => {
+  /*
+   * 番号は撃った分も含めた並びの位置で振る。
+   *
+   * 撃った順に 1 から振り直すと、順番を飛ばして撃つたびに全員の番号が動く。
+   * 番号が動くと左右の砲の割り当ても動き、カードが列をまたいで飛ぶ。
+   * 並びが安定していても、見た目には入れ替わったようにしか見えない。
+   */
+  const orderOf = new Map(ordered.map((s, i) => [s.target.id, i + 1]))
+  const doneSteps: PlanStep[] = ordered
+    .filter((s) => s.target.done)
+    .map((solution) => ({
+      solution,
+      order: orderOf.get(solution.target.id)!,
+      gun: solution.target.firedGun ?? 'left',
+      magIndex: 0,
+      needsResupply: false,
+      turnFromPrev: null,
+      reloadStall: false,
+    }))
+
+  // 旋回量はこれから撃つ分どうしで測る。撃った分を挟むと、
+  // すでに済んだ動きをもう一度数えてしまう
+  const pending = ordered.filter((s) => !s.target.done)
+
+  const steps: PlanStep[] = pending.map((solution, i) => {
     const gun: Side =
       solution.target.gun !== 'auto'
         ? solution.target.gun
@@ -414,7 +484,7 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
           ? 'right'
           : 'left'
 
-    const prev = ordered[i - 1]
+    const prev = pending[i - 1]
     const turnFromPrev =
       prev === undefined
         ? lastFired === null
@@ -433,7 +503,7 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
       solution,
       // 撃ち終えたぶんを数に含めて続きから振る。ここで詰め直すと、
       // 1 発撃つたびに残りの番号がずれて、どれを撃つ順番だったか分からなくなる。
-      order: done.length + i + 1,
+      order: orderOf.get(solution.target.id)!,
       gun,
       magIndex,
       needsResupply: magIndex >= READY_ROUNDS_PER_GUN,
@@ -442,7 +512,7 @@ export function buildPlan(targets: readonly Target[]): FiringPlan {
     }
   })
 
-  return { steps, totalTurnDeg, unplaced, done }
+  return { steps, totalTurnDeg, unplaced, done, doneSteps }
 }
 
 /* ---------- 行への組み分け ---------- */

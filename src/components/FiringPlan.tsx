@@ -69,7 +69,7 @@ export function FiringPlan({
   candidateFixIds,
   onRemove,
 }: Props) {
-  const { steps, totalTurnDeg, unplaced, done } = plan
+  const { steps, totalTurnDeg, unplaced, done, doneSteps } = plan
 
   /**
    * 撃ち終えたカードも、その場に残して印だけ付ける。
@@ -77,21 +77,9 @@ export function FiringPlan({
    * 撃つたびに列から抜けると、残りが繰り上がって「次はどれだったか」が
    * 分からなくなる。左右そろって撃ち終えた行だけを畳む。
    */
-  const firedSteps: PlanStep[] = [...done]
-    .sort((a, b) => (a.target.firedAt ?? 0) - (b.target.firedAt ?? 0))
-    .map((solution, i) => ({
-      solution,
-      // 撃った順の通し番号。これから撃つぶんはその続きから振られるので、
-      // 撃っても番号が動かず、重複も欠番も出ない。
-      order: i + 1,
-      gun: solution.target.firedGun ?? 'left',
-      magIndex: 0,
-      needsResupply: false,
-      turnFromPrev: null,
-      reloadStall: false,
-    }))
-
-  const shown = [...firedSteps, ...steps].sort((a, b) => a.order - b.order)
+  // 撃ったぶんの番号は撃つ前と同じ（buildPlan で振る）。撃った順に 1 から
+  // 振り直すと、順番を飛ばして撃つたびに全員の番号が動く。
+  const shown = [...doneSteps, ...steps].sort((a, b) => a.order - b.order)
   const rows = pairSteps(shown)
 
   const rowIsCleared = (row: (typeof rows)[number]) =>
