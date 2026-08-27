@@ -27,6 +27,7 @@ import {
   type KnownPoint,
   type Sighting,
   type SurveyDoc,
+  type ResolvedFix,
 } from '../lib/survey'
 import { isShellCode, type ShellCode } from '../lib/shells'
 import { isPriority, type Measurement, type Priority, type Target } from '../lib/targets'
@@ -261,6 +262,80 @@ export function Plotting({
   // 実測で座標が定まった標定は、もう推定ではなく既知点として扱える
   const settled = settledFixes(doc)
   const targetFixes = survey.fixes.filter((f) => f.fix.id !== NEST_FIX_ID)
+
+  /*
+   * 撃ち終えた標定を畳む。
+   *
+   * 標定は撃ったあとも消えない。基準点として使われることがあるし、外れたときに
+   * 座標を入れ直す先でもある。ただし片づかないまま縦に積み上がるので、任務が
+   * 進むほど「まだ撃っていない目標」を探すのに画面を延々と繰ることになる。
+   *
+   * 紐づく射撃順のカードが 1 枚もないうちは畳まない。まだ送っていないだけの
+   * 標定と、撃ち終えた標定を同じ扱いにすると、送り忘れが見えなくなる。
+   */
+  const isCleared = (resolved: ResolvedFix) => {
+    const cards = targets.filter((t) => t.originFixId === resolved.fix.id)
+    return cards.length > 0 && cards.every((t) => t.done)
+  }
+  const active = targetFixes.filter((f) => !isCleared(f))
+  const cleared = targetFixes.filter(isCleared)
+
+  const renderFixCard = (resolved: ResolvedFix) => (
+            <FixCard
+              key={resolved.fix.id}
+              resolved={resolved}
+              sources={availableSources(doc, resolved.fix.id)}
+              nest={survey.nest}
+              onLabel={(label) => patchFix(resolved.fix.id, { label })}
+              onSighting={(sightingId, change) =>
+                patchFix(resolved.fix.id, {
+                  sightings: resolved.fix.sightings.map((s) =>
+                    s.id === sightingId ? { ...s, ...change } : s,
+                  ),
+                })
+              }
+              onAddSighting={() =>
+                patchFix(resolved.fix.id, {
+                  sightings: [
+                    ...resolved.fix.sightings,
+                    // まだ使っていない偵察兵がいれば、それを既定にする
+                    newSighting(
+                      defaultSources(doc).find(
+                        (candidate) =>
+                          !resolved.fix.sightings.some((s) => s.fromId === candidate),
+                      ),
+                    ),
+                  ],
+                })
+              }
+              onRemoveSighting={(sightingId) =>
+                patchFix(resolved.fix.id, {
+                  sightings: resolved.fix.sightings.filter((s) => s.id !== sightingId),
+                })
+              }
+              onRemove={() => onRemoveFix(resolved.fix.id)}
+              durable={isFixDurable(doc, resolved.fix.id)}
+              onAddTarget={onAddTarget}
+              onShell={(code) => isShellCode(code) && onFixShell(resolved.fix.id, code)}
+              onPriority={(value) =>
+                isPriority(value) && onFixPriority(resolved.fix.id, value)
+              }
+              onToggleReference={() => {
+                // 役割が変われば呼び名も変わる。手で付けた名前はそのまま残す
+                const becoming = !resolved.fix.isReference
+                patchFix(resolved.fix.id, {
+                  isReference: becoming,
+                  label: labelForRole(doc, resolved.fix, becoming),
+                })
+              }}
+              onToggleTarget={() =>
+                patchFix(resolved.fix.id, { isTarget: !resolved.fix.isTarget })
+              }
+              onPinnedGrid={(pinnedGrid) => patchFix(resolved.fix.id, { pinnedGrid })}
+              linked={targets.filter((t) => t.originFixId === resolved.fix.id)}
+            />
+  )
+
 
   /** 位置報告の要請を片付ける。補給隊とその標定を消す。 */
   const cancelConvoys = () => {
@@ -548,62 +623,20 @@ export function Plotting({
         </div>
 
         <div className="fixes__list">
-          {targetFixes.map((resolved) => (
-            <FixCard
-              key={resolved.fix.id}
-              resolved={resolved}
-              sources={availableSources(doc, resolved.fix.id)}
-              nest={survey.nest}
-              onLabel={(label) => patchFix(resolved.fix.id, { label })}
-              onSighting={(sightingId, change) =>
-                patchFix(resolved.fix.id, {
-                  sightings: resolved.fix.sightings.map((s) =>
-                    s.id === sightingId ? { ...s, ...change } : s,
-                  ),
-                })
-              }
-              onAddSighting={() =>
-                patchFix(resolved.fix.id, {
-                  sightings: [
-                    ...resolved.fix.sightings,
-                    // まだ使っていない偵察兵がいれば、それを既定にする
-                    newSighting(
-                      defaultSources(doc).find(
-                        (candidate) =>
-                          !resolved.fix.sightings.some((s) => s.fromId === candidate),
-                      ),
-                    ),
-                  ],
-                })
-              }
-              onRemoveSighting={(sightingId) =>
-                patchFix(resolved.fix.id, {
-                  sightings: resolved.fix.sightings.filter((s) => s.id !== sightingId),
-                })
-              }
-              onRemove={() => onRemoveFix(resolved.fix.id)}
-              durable={isFixDurable(doc, resolved.fix.id)}
-              onAddTarget={onAddTarget}
-              onShell={(code) => isShellCode(code) && onFixShell(resolved.fix.id, code)}
-              onPriority={(value) =>
-                isPriority(value) && onFixPriority(resolved.fix.id, value)
-              }
-              onToggleReference={() => {
-                // 役割が変われば呼び名も変わる。手で付けた名前はそのまま残す
-                const becoming = !resolved.fix.isReference
-                patchFix(resolved.fix.id, {
-                  isReference: becoming,
-                  label: labelForRole(doc, resolved.fix, becoming),
-                })
-              }}
-              onToggleTarget={() =>
-                patchFix(resolved.fix.id, { isTarget: !resolved.fix.isTarget })
-              }
-              onPinnedGrid={(pinnedGrid) => patchFix(resolved.fix.id, { pinnedGrid })}
-              linked={targets.filter((t) => t.originFixId === resolved.fix.id)}
-            />
-          ))}
+          {active.map(renderFixCard)}
         </div>
+
+        {cleared.length > 0 && (
+          <details className="cleared">
+            <summary className="cleared__head">
+              撃破済み <strong>{cleared.length}</strong> 件
+              <span className="cleared__hint">
+                {cleared.map((f) => f.fix.label).join('・')}
+              </span>
+            </summary>
+            <div className="fixes__list">{cleared.map(renderFixCard)}</div>
+          </details>
+        )}
 
         <button
           className="section__add"

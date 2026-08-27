@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { HardReset } from './components/HardReset'
+import { StickyNav } from './components/StickyNav'
 import { ROUTES, ROUTE_TITLE, useHashRoute } from './lib/route'
 import { emptySurveyDoc, Plotting } from './pages/Plotting'
 import { FireControl } from './pages/FireControl'
@@ -489,9 +490,32 @@ export function App() {
   )
 
   /** 観測基準点になっている標定。そこへの射撃だけ確認射撃として扱う。 */
-  const verifyFixIds = useMemo(
-    () => new Set(doc.fixes.filter((f) => f.isReference).map((f) => f.id)),
-    [doc],
+  /**
+   * 撃った結果を報告できる標定。
+   *
+   * 観測基準点は、当たれば座標が実測値に変わるので常に対象。
+   * それとは別に、候補が 2 つ残っている標定も対象にする。片方へ撃って
+   * 当たり外れが分かれば、そこで候補は 1 つに決まる。撃つ手立てが無いと
+   * 「どちらかへ撃って確かめてください」と勧めておきながら、
+   * 結果を受け取る欄がどこにも無い、ということになる。
+   */
+  const verifyFixIds = useMemo(() => {
+    const ids = new Set(doc.fixes.filter((f) => f.isReference).map((f) => f.id))
+    for (const entry of survey.fixes) {
+      if (entry.alternative !== null) ids.add(entry.fix.id)
+    }
+    return ids
+  }, [doc, survey])
+
+  /** 観測基準点ではなく、候補の絞り込みのために撃つ標定。文言を変える。 */
+  const candidateFixIds = useMemo(
+    () =>
+      new Set(
+        survey.fixes
+          .filter((f) => f.alternative !== null && !f.fix.isReference)
+          .map((f) => f.fix.id),
+      ),
+    [survey],
   )
 
   const title = ROUTE_TITLE[route]
@@ -555,6 +579,7 @@ export function App() {
           onReportMiss={reportMiss}
           onRecordImpact={recordImpact}
           verifyFixIds={verifyFixIds}
+          candidateFixIds={candidateFixIds}
           onRemove={removeTarget}
           onClear={() => {
             remember('目標をすべて削除')
@@ -566,6 +591,8 @@ export function App() {
       <footer className="appfoot">
         <HardReset />
       </footer>
+
+      <StickyNav route={route} go={go} fireCount={plan.steps.length} />
     </div>
   )
 }

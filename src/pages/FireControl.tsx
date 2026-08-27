@@ -23,6 +23,7 @@ interface Props {
   onReportMiss: (id: string) => void
   onRecordImpact: (id: string) => void
   verifyFixIds: ReadonlySet<string>
+  candidateFixIds: ReadonlySet<string>
   onRemove: (id: string) => void
   onClear: () => void
 }
@@ -39,6 +40,7 @@ export function FireControl({
   onReportMiss,
   onRecordImpact,
   verifyFixIds,
+  candidateFixIds,
   onRemove,
   onClear,
 }: Props) {
@@ -59,6 +61,7 @@ export function FireControl({
         onReportMiss={onReportMiss}
         onRecordImpact={onRecordImpact}
         verifyFixIds={verifyFixIds}
+        candidateFixIds={candidateFixIds}
         onRemove={onRemove}
       />
 

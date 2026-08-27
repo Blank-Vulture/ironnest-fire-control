@@ -54,6 +54,17 @@ export interface Contribution {
 export interface Accuracy {
   /** 位置の見込み誤差（km）。各観測のぶんを二乗和平方根でまとめたもの。 */
   radiusKm: number
+  /** いちばん延びる向きの見込み誤差（km）。 */
+  majorKm: number
+  /** それと直角の向きの見込み誤差（km）。 */
+  minorKm: number
+  /** いちばん延びる向きの方位（度）。 */
+  majorBearingDeg: number
+  /**
+   * 誤差の細長さ。1 なら丸く、大きいほど帯状。
+   * 帯なら、その向きに直角から観測を足すのがいちばん効く。
+   */
+  elongation: number
   /** 効き方の大きい順。先頭を直すのがいちばん効く。 */
   contributions: Contribution[]
 }
@@ -67,7 +78,11 @@ function shiftedBy(
 }
 
 /**
- * 振った報告で解き直して、答えがどれだけ動いたかを測る。
+ * 振った報告で解き直して、答えがどの向きへどれだけ動いたかを測る。
+ *
+ * 向きまで持つのは、誤差が丸いとは限らないため。ほとんど接する 2 円のように、
+ * 一方向だけ極端に伸びる場合がある。大きさだけにまとめると、実際は細長い
+ * 帯なのに半径の大きな円のように見えてしまう。
  *
  * 候補が 2 つある解では、どちらを「本命」と名乗るかが解き直すたびに入れ替わる。
  * 返ってきた position をそのまま測ると、追っている点の動きではなく候補の
@@ -80,13 +95,18 @@ function shiftedBy(
 function displacement(
   observations: readonly Observation[],
   from: Point,
-): number {
+): { dx: number; dy: number; length: number } {
+  const none = { dx: 0, dy: 0, length: 0 }
   const result = triangulate(observations)
-  if (result.kind !== 'solved') return 0
+  if (result.kind !== 'solved') return none
+
   const { position, alternative } = result.estimate
-  const moved = distanceBetween(from, position)
-  if (alternative === null) return moved
-  return Math.min(moved, distanceBetween(from, alternative))
+  const to =
+    alternative !== null &&
+    distanceBetween(from, alternative) < distanceBetween(from, position)
+      ? alternative
+      : position
+  return { dx: to.x - from.x, dy: to.y - from.y, length: distanceBetween(from, to) }
 }
 
 /**
@@ -100,16 +120,20 @@ export function estimateAccuracy(
   solved: Point,
 ): Accuracy {
   const contributions: Contribution[] = []
+  /** 向きごとの広がり。対称なので 3 成分で足りる。 */
+  const spread = { xx: 0, xy: 0, yy: 0 }
 
   observations.forEach((observation, index) => {
     // 出どころごとに分けて持つ。方位と座標は別々に生じる幅なので、
     // 大きい方だけ採ると小さい方が覆い隠されて誤差を過小に見積もる
-    const byCause: Record<Cause, number> = { bearing: 0, range: 0, position: 0 }
+    type Move = { dx: number; dy: number; length: number }
+    const zero: Move = { dx: 0, dy: 0, length: 0 }
+    const byCause: Record<Cause, Move> = { bearing: zero, range: zero, position: zero }
 
     /** 振った結果がその出どころのこれまでの最大より大きければ控える。 */
     const consider = (candidate: Partial<Observation>, from: Cause) => {
       const moved = displacement(shiftedBy(observations, index, candidate), solved)
-      if (moved > byCause[from]) byCause[from] = moved
+      if (moved.length > byCause[from].length) byCause[from] = moved
     }
 
     if (observation.bearingDeg !== null) {
@@ -146,10 +170,20 @@ export function estimateAccuracy(
     }
 
     // 互いに独立とみなして二乗和平方根でまとめる
-    const shiftKm = Math.hypot(byCause.bearing, byCause.range, byCause.position)
+    const shiftKm = Math.hypot(
+      byCause.bearing.length,
+      byCause.range.length,
+      byCause.position.length,
+    )
+    // 向きごとの広がりも積む。あとで長軸・短軸に分けるため
+    for (const move of Object.values(byCause)) {
+      spread.xx += move.dx * move.dx
+      spread.xy += move.dx * move.dy
+      spread.yy += move.dy * move.dy
+    }
     if (shiftKm > 0) {
       const cause = (Object.keys(byCause) as Cause[]).reduce((worst, key) =>
-        byCause[key] > byCause[worst] ? key : worst,
+        byCause[key].length > byCause[worst].length ? key : worst,
       )
       contributions.push({
         id: observation.id,
@@ -165,7 +199,28 @@ export function estimateAccuracy(
   )
   contributions.sort((a, b) => b.shiftKm - a.shiftKm)
 
-  return { radiusKm, contributions }
+  /*
+   * 広がりを長軸と短軸に分ける。2 行 2 列の対称行列なので、固有値は
+   * 平方根で直に出る。行列を持ち出すまでもない。
+   */
+  const half = (spread.xx + spread.yy) / 2
+  const gap = Math.sqrt(((spread.xx - spread.yy) / 2) ** 2 + spread.xy * spread.xy)
+  const majorKm = Math.sqrt(Math.max(0, half + gap))
+  const minorKm = Math.sqrt(Math.max(0, half - gap))
+
+  // 長軸の向き。x が東・y が北なので、方位は atan2(東, 北)
+  const angle = 0.5 * Math.atan2(2 * spread.xy, spread.xx - spread.yy)
+  const majorBearingDeg =
+    (((Math.atan2(Math.cos(angle), Math.sin(angle)) * 180) / Math.PI) % 180 + 180) % 180
+
+  return {
+    radiusKm,
+    majorKm,
+    minorKm,
+    majorBearingDeg,
+    elongation: minorKm > 0 ? majorKm / minorKm : Infinity,
+    contributions,
+  }
 }
 
 /**

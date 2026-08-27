@@ -19,7 +19,13 @@ interface Props {
   onReportMiss: () => void
   onRecordImpact: () => void
   /** 観測基準点への射撃か。普通の攻撃と確認射撃を見分けるため。 */
-  verifying: boolean
+  /**
+   * 確認射撃の種類。
+   * 'reference' は観測基準点の座標を確かめる射撃、
+   * 'candidate' は候補が 2 つあるうちの片方を試す射撃。
+   * どちらも当たり外れを聞くが、分かることが違うので文言を変える。
+   */
+  verifying: 'reference' | 'candidate' | null
   onRemove: () => void
 }
 
@@ -53,7 +59,7 @@ export function SolutionCard({
   return (
     <article
       className={`card card--${gun}${unreachable ? ' is-unreachable' : ''}${
-        verifying ? ' is-verifying' : ''
+        verifying !== null ? ' is-verifying' : ''
       }${target.done ? ' is-fired' : ''}`}
     >
       <header className="card__head">
@@ -211,11 +217,13 @@ export function SolutionCard({
         候補が 2 つあるうちの片方を撃つカード。当たったか外れたかが分かれば、
         標定の候補はそこで 1 つに決まる。
       */}
-      {verifying && (
+      {verifying !== null && (
         <div className="card__probe">
           {/* 候補は確定すると入れ替わるので、番号で呼ばない。
               「撃った結果どうだったか」だけを聞く。 */}
-          <span className="card__k">確認射撃 · 観測基準点</span>
+          <span className="card__k">
+            確認射撃 · {verifying === 'candidate' ? '候補の絞り込み' : '観測基準点'}
+          </span>
           <div className="card__outcome" role="group" aria-label="射撃の結果">
             <button
               className={`card__hit${target.outcome === 'hit' ? ' is-on' : ''}`}
@@ -234,9 +242,13 @@ export function SolutionCard({
           </div>
           {target.outcome !== undefined && (
             <span className="card__verdict">
-              {target.outcome === 'hit'
-                ? 'この位置を実測座標として確定しました'
-                : '外れ — 標定側で座標を入れ直してください'}
+              {verifying === 'candidate'
+                ? target.outcome === 'hit'
+                  ? 'この候補に確定しました'
+                  : '外れ — もう一方の候補に確定しました'
+                : target.outcome === 'hit'
+                  ? 'この位置を実測座標として確定しました'
+                  : '外れ — 標定側で座標を入れ直してください'}
             </span>
           )}
         </div>
@@ -246,7 +258,7 @@ export function SolutionCard({
         外れ弾も情報になる。着弾点は自分が撃った座標そのものなので位置が正確で、
         そこから目標までの距離が報告される。方角も来るが曖昧なので使わない。
       */}
-      {!verifying && (
+      {verifying === null && (
         <div className="card__probe">
           <span className="card__k">射撃の結果</span>
           <div className="card__outcome" role="group" aria-label="射撃の結果">

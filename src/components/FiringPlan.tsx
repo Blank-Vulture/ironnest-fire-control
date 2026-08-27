@@ -28,6 +28,7 @@ interface Props {
   onRecordImpact: (id: string) => void
   /** 観測基準点になっている標定の id。そこへの射撃だけ確認射撃として扱う。 */
   verifyFixIds: ReadonlySet<string>
+  candidateFixIds: ReadonlySet<string>
   onRemove: (id: string) => void
 }
 
@@ -65,6 +66,7 @@ export function FiringPlan({
   onReportMiss,
   onRecordImpact,
   verifyFixIds,
+  candidateFixIds,
   onRemove,
 }: Props) {
   const { steps, totalTurnDeg, unplaced, done } = plan
@@ -137,8 +139,13 @@ export function FiringPlan({
             onReportMiss={() => onReportMiss(step.solution.target.id)}
             onRecordImpact={() => onRecordImpact(step.solution.target.id)}
             verifying={
-              step.solution.target.originFixId !== undefined &&
-              verifyFixIds.has(step.solution.target.originFixId)
+              step.solution.target.originFixId === undefined
+                ? null
+                : candidateFixIds.has(step.solution.target.originFixId)
+                  ? 'candidate'
+                  : verifyFixIds.has(step.solution.target.originFixId)
+                    ? 'reference'
+                    : null
             }
             onRemove={() => onRemove(step.solution.target.id)}
           />

@@ -183,8 +183,30 @@ export function FixCard({
           ))}
         </select>
 
+        {/*
+          見出しの座標はそのまま入力欄にする。
+          偵察兵の報告が無くても座標だけ分かっていることがあり、そのたびに
+          観測を 2 つでっち上げるのは筋が悪い。ここへ打てば実測座標として
+          確定し、観測元としても使える。
+          解けている座標を上書きしようとしたときだけ、消し方を添える。
+        */}
         <span className="fix__position">
-          {position !== null ? (formatPoint(position) ?? 'マップ外') : '—'}
+          <input
+            className="fix__grid"
+            value={fix.pinnedGrid ?? (position !== null ? (formatPoint(position) ?? '') : '')}
+            onChange={(e) => onPinnedGrid(e.target.value)}
+            placeholder="H4 4:3"
+            spellCheck={false}
+            autoComplete="off"
+            aria-label="座標（打ち込むと実測座標になります）"
+            aria-invalid={badPin}
+            title={
+              resolved.pinned
+                ? '実測座標。空にすると推定に戻ります'
+                : '座標が分かっているなら直接打てます'
+            }
+            size={9}
+          />
           {resolved.alternative === null && <Badges states={stateOf(1)} />}
         </span>
 
@@ -343,6 +365,15 @@ export function FixCard({
         resolved={resolved}
         shallow={shallow}
         radiusKm={viewing?.accuracy?.radiusKm ?? resolved.accumulatedKm}
+        ellipse={
+          // 2 倍以上に伸びていて初めて向きに意味がある。ほぼ丸いうちに
+          // 向きを出しても、端数の揺らぎを方角として読ませるだけになる
+          viewing?.accuracy !== undefined &&
+          viewing?.accuracy !== null &&
+          viewing.accuracy.elongation >= 2
+            ? viewing.accuracy
+            : null
+        }
       />
 
       {/*
@@ -411,11 +442,14 @@ function FixStatusLine({
   resolved,
   shallow,
   radiusKm,
+  ellipse,
 }: {
   resolved: ResolvedFix
   shallow: boolean
   /** いま見ている候補の見込み誤差（km）。候補ごとに違うので外から渡す。 */
   radiusKm: number
+  /** 誤差が丸くないときの長軸の向きと短軸。丸ければ null。 */
+  ellipse: { majorBearingDeg: number; minorKm: number } | null
 }) {
   const { status } = resolved
 
@@ -450,6 +484,17 @@ function FixStatusLine({
       <p className="fix__numbers">
         報告の食い違い ±{metres(resolved.residualKm)}
         {' · '}見込み誤差 ±{metres(radiusKm)}
+        {/*
+          誤差が細長いときは向きまで出す。ほとんど接する 2 円のような配置では
+          一方向にだけ伸びるので、半径いくつの円と読むと実際より広く身構える。
+          どちらへ外れうるかが分かれば、観測を足す向きも決めやすい。
+        */}
+        {ellipse !== null && (
+          <span className="fix__ellipse">
+            （方位 {ellipse.majorBearingDeg.toFixed(0)}° 方向。横は ±
+            {metres(ellipse.minorKm)}）
+          </span>
+        )}
         {resolved.crossingAngleDeg !== null &&
           ` · 交差角 ${resolved.crossingAngleDeg.toFixed(0)}°`}
       </p>
