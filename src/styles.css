@@ -61,6 +61,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: clamp(14px, 2vw, 22px);
+  /*
+   * 下に浮いている画面切り替えボタンのぶんだけ、逃げ場を空けておく。
+   * 無いと、いちばん下まで送ったときにボタンが「射撃順に追加」の上に重なる。
+   * ページの終わりにある操作ほど、そこまで送って押すものなので致命的になる。
+   */
+  padding-bottom: calc(64px + max(16px, env(safe-area-inset-bottom)));
 }
 
 input,
@@ -3393,9 +3399,13 @@ code {
  */
 .stickynav {
   position: fixed;
-  left: 50%;
+  /*
+   * 右下に寄せる。中央だと、幅いっぱいに広がる観測元の選択や方位の欄の
+   * ちょうど真上に来る。右端なら覆う範囲が狭く、覆う相手も削除の ✕ 程度で済む。
+   */
+  right: max(16px, env(safe-area-inset-right));
   bottom: max(16px, env(safe-area-inset-bottom));
-  transform: translate(-50%, calc(100% + 16px));
+  transform: translateY(calc(100% + 16px));
   z-index: 20;
   display: flex;
   align-items: center;
@@ -3427,7 +3437,7 @@ code {
 }
 
 .stickynav.is-shown {
-  transform: translate(-50%, 0);
+  transform: translateY(0);
   opacity: 1;
 }
 
@@ -3602,5 +3612,25 @@ code {
 
   .fix__label {
     grid-column: 1 / -1;
+  }
+}
+
+/* 狭い画面では日本語の短い呼び名にして、覆う幅を詰める */
+.stickynav__short {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .stickynav {
+    padding: 10px 14px;
+    gap: 6px;
+  }
+
+  .stickynav__long {
+    display: none;
+  }
+
+  .stickynav__short {
+    display: inline;
   }
 }
